@@ -14,8 +14,11 @@
 // limitations under the License.
 //
 
-#import <EarlGrey/GREYConstants.h>
 #import <UIKit/UIKit.h>
+
+#import <EarlGrey/GREYConstants.h>
+
+NS_ASSUME_NONNULL_BEGIN
 
 /**
  *  A utility class for creating and injecting gestures that involve touch paths, for example:
@@ -29,12 +32,14 @@
  *
  *  @param startPointInWindowCoordinates The start point within the given @c window
  *  @param direction                     The direction of the touch path.
+ *  @param duration                      How long the gesture should last (in seconds).
  *  @param window                        The window in which the touch path is generated.
  *
  *  @return NSArray of CGPoints that denote the points in the touch path.
  */
 + (NSArray *)touchPathForGestureWithStartPoint:(CGPoint)startPointInWindowCoordinates
                                   andDirection:(GREYDirection)direction
+                                   andDuration:(CFTimeInterval)duration
                                       inWindow:(UIWindow *)window;
 
 /**
@@ -65,22 +70,22 @@
                          withDirection:(GREYDirection)direction
                                 length:(CGFloat)length
                     startPointPercents:(CGPoint)startPointPercents
-                    outRemainingAmount:(CGFloat *)outRemainingAmountOrNull;
+                    outRemainingAmount:(CGFloat *_Nullable)outRemainingAmountOrNull;
 
 /**
  *  Generates a touch path in the @c window from the given @c startPoint and the given @c
- *  endPoint. Based on the @c GREYPinchDirection two such touch paths are required to generate pinch
- *  gesture. If the pinch direction is @c kGREYPinchDirectionOutward then two touch paths have
- *  starting points as the center of the view under test and ending points are on circle having
- *  touch path as the radius. Similarly when pinch direction is @c kGREYPinchDirectionInward then
- *  two touch paths have starting points on the circle having touch path as the radius and
- *  ending points are the center of the the view under test.
+ *  endPoint.
  *
- *  @param startPoint The starting point for touch path.
- *  @param endPoint   The end point for touch path
+ *  @param startPoint    The starting point for touch path.
+ *  @param endPoint      The end point for touch path.
+ *  @param cancelInertia A boolean value indicating whether intertial movement should be cancelled.
  *
  *  @return NSArray of CGPoints that denote the points in the touch path.
  */
-+ (NSArray *)touchPathForPinchGestureWithStartPoint:(CGPoint)startPoint
-                                        andEndPoint:(CGPoint)endPoint;
++ (NSArray *)touchPathForDragGestureWithStartPoint:(CGPoint)startPoint
+                                          endPoint:(CGPoint)endPoint
+                                     cancelInertia:(BOOL)cancelInertia;
+
 @end
+
+NS_ASSUME_NONNULL_END

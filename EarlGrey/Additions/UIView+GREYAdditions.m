@@ -20,9 +20,11 @@
 
 #import "Additions/NSObject+GREYAdditions.h"
 #import "Common/GREYConstants.h"
+#import "Common/GREYFatalAsserts.h"
 #import "Common/GREYSwizzler.h"
 #import "Provider/GREYElementProvider.h"
 #import "Synchronization/GREYAppStateTracker.h"
+#import "Synchronization/GREYAppStateTrackerObject.h"
 #import "Synchronization/GREYTimedIdlingResource.h"
 
 @implementation UIView (GREYAdditions)
@@ -34,12 +36,12 @@
     BOOL swizzleSuccess = [swizzler swizzleClass:self
                            replaceInstanceMethod:@selector(setNeedsDisplay)
                                       withMethod:@selector(greyswizzled_setNeedsDisplay)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIView setNeedsDisplay");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle UIView setNeedsDisplay");
 
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(setFrame:)
                                  withMethod:@selector(greyswizzled_setFrame:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIView setFrame");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle UIView setFrame");
 
     // TODO: We are making the assumption that no parent view will adjust the bounds of
     // its subview. If this assumption fails, we would need to swizzle setBounds as well and make
@@ -47,76 +49,82 @@
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(setCenter:)
                                  withMethod:@selector(greyswizzled_setCenter:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIView setCenter");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle UIView setCenter");
 
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(addSubview:)
                                  withMethod:@selector(greyswizzled_addSubview:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIView addSubview");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle UIView addSubview");
 
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(willRemoveSubview:)
                                  withMethod:@selector(greyswizzled_willRemoveSubview:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIView willRemoveSubview");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle UIView willRemoveSubview");
 
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(insertSubview:atIndex:)
                                  withMethod:@selector(greyswizzled_insertSubview:atIndex:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIView insertSubview:atIndex:");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle UIView insertSubview:atIndex:");
 
     SEL originalSel = @selector(exchangeSubviewAtIndex:withSubviewAtIndex:);
     SEL swizzledSel = @selector(greyswizzled_exchangeSubviewAtIndex:withSubviewAtIndex:);
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:originalSel
                                  withMethod:swizzledSel];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIView exchangeSubviewAtIndex:withSubviewAtIndex:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIView exchangeSubviewAtIndex:withSubviewAtIndex:");
 
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(insertSubview:aboveSubview:)
                                  withMethod:@selector(greyswizzled_insertSubview:aboveSubview:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIView insertSubview:aboveSubview:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIView insertSubview:aboveSubview:");
 
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(insertSubview:belowSubview:)
                                  withMethod:@selector(greyswizzled_insertSubview:belowSubview:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIView insertSubview:belowSubview:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIView insertSubview:belowSubview:");
 
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(setNeedsDisplayInRect:)
                                  withMethod:@selector(greyswizzled_setNeedsDisplayInRect:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIView setNeedsDisplayInRect");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle UIView setNeedsDisplayInRect");
 
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(setNeedsLayout)
                                  withMethod:@selector(greyswizzled_setNeedsLayout)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIView setNeedsLayout");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle UIView setNeedsLayout");
 
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(setNeedsUpdateConstraints)
                                  withMethod:@selector(greyswizzled_setNeedsUpdateConstraints)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIView setNeedsUpdateConstraints");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle UIView setNeedsUpdateConstraints");
 
     // Swizzle for tracking block based animations.
     swizzleSuccess =
     [swizzler swizzleClass:self
         replaceClassMethod:@selector(animateWithDuration:animations:)
                 withMethod:@selector(greyswizzled_animateWithDuration:animations:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIView animateWithDuration:animations:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIView animateWithDuration:animations:");
 
     originalSel = @selector(animateWithDuration:animations:completion:);
     swizzledSel = @selector(greyswizzled_animateWithDuration:animations:completion:);
     swizzleSuccess = [swizzler swizzleClass:self
                          replaceClassMethod:originalSel
                                  withMethod:swizzledSel];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIView animateWithDuration:animations:completion:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIView animateWithDuration:animations:completion:");
 
     originalSel = @selector(animateWithDuration:delay:options:animations:completion:);
     swizzledSel = @selector(greyswizzled_animateWithDuration:delay:options:animations:completion:);
     swizzleSuccess = [swizzler swizzleClass:self
                          replaceClassMethod:originalSel
                                  withMethod:swizzledSel];
-    NSAssert(swizzleSuccess,
-             @"Cannot swizzle UIView animateWithDuration:delay:options:animations:completion:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle "
+                               @"UIView animateWithDuration:delay:options:animations:completion:");
 
     originalSel = @selector(animateWithDuration:delay:usingSpringWithDamping:initialSpringVelocity:
                             options:animations:completion:);
@@ -125,9 +133,10 @@
     swizzleSuccess = [swizzler swizzleClass:self
                          replaceClassMethod:originalSel
                                  withMethod:swizzledSel];
-    NSAssert(swizzleSuccess,
-             @"Cannot swizzle UIView animateWithDuration:delay:usingSpringWithDamping:"
-             @"initialSpringVelocity:options:animations:completion:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIView animateWithDuration:delay:"
+                               @"usingSpringWithDamping:initialSpringVelocity:options:animations"
+                               @":completion:");
 
     originalSel = @selector(transitionWithView:duration:options:animations:completion:);
     swizzledSel =
@@ -135,16 +144,18 @@
     swizzleSuccess = [swizzler swizzleClass:self
                          replaceClassMethod:originalSel
                                  withMethod:swizzledSel];
-    NSAssert(swizzleSuccess,
-             @"Cannot swizzle UIView transitionWithView:duration:options:animations:completion:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIView "
+                               @"transitionWithView:duration:options:animations:completion:");
 
     originalSel = @selector(transitionFromView:toView:duration:options:completion:);
     swizzledSel = @selector(greyswizzled_transitionFromView:toView:duration:options:completion:);
     swizzleSuccess = [swizzler swizzleClass:self
                          replaceClassMethod:originalSel
                                  withMethod:swizzledSel];
-    NSAssert(swizzleSuccess,
-             @"Cannot swizzle UIView transitionFromView:toView:duration:options:completion:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle "
+                               @"UIView transitionFromView:toView:duration:options:completion:");
 
     originalSel = @selector(animateKeyframesWithDuration:delay:options:animations:completion:);
     swizzledSel = @selector(greyswizzled_animateKeyframesWithDuration:delay:options:animations:
@@ -152,9 +163,9 @@
     swizzleSuccess = [swizzler swizzleClass:self
                          replaceClassMethod:originalSel
                                  withMethod:swizzledSel];
-    NSAssert(swizzleSuccess,
-             @"Cannot swizzle UIView "
-             @"animateKeyframesWithDuration:delay:options:animations:completion:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIView animateKeyframesWithDuration:delay:options:"
+                               @"animations:completion:");
 
     originalSel = @selector(performSystemAnimation:onViews:options:animations:completion:);
     swizzledSel =
@@ -162,12 +173,13 @@
     swizzleSuccess = [swizzler swizzleClass:self
                          replaceClassMethod:originalSel
                                  withMethod:swizzledSel];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIView performSystemAnimation:onViews:"
-                             @"options:animations:completion:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIView performSystemAnimation:onViews:"
+                               @"options:animations:completion:");
   }
 }
 
-- (NSArray *)grey_childElementsAssignableFromClass:(Class)klass {
+- (NSArray *)grey_childrenAssignableFromClass:(Class)klass {
   NSMutableArray *subviews = [[NSMutableArray alloc] init];
   for (UIView *child in self.subviews) {
     GREYElementProvider *childHierarchy = [GREYElementProvider providerWithRootElements:@[ child ]];
@@ -199,6 +211,24 @@
   if (alwaysTopSubview && [self.subviews containsObject:alwaysTopSubview]) {
     [self bringSubviewToFront:alwaysTopSubview];
   }
+}
+
+- (void)grey_recursivelyMakeOpaque {
+  objc_setAssociatedObject(self,
+                           @selector(grey_restoreOpacity),
+                           @(self.alpha),
+                           OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+  self.alpha = 1.0;
+  [self.superview grey_recursivelyMakeOpaque];
+}
+
+- (void)grey_restoreOpacity {
+  NSNumber *alpha = objc_getAssociatedObject(self, @selector(grey_restoreOpacity));
+  if (alpha) {
+    self.alpha = [alpha floatValue];
+    objc_setAssociatedObject(self, @selector(grey_restoreOpacity), nil, OBJC_ASSOCIATION_ASSIGN);
+  }
+  [self.superview grey_restoreOpacity];
 }
 
 - (void)grey_saveCurrentAlphaAndUpdateWithValue:(float)alpha {
@@ -303,37 +333,37 @@
 }
 
 - (void)greyswizzled_setNeedsDisplayInRect:(CGRect)rect {
-  NSString *elementID = TRACK_STATE_FOR_ELEMENT(kGREYPendingDrawLayoutPass, self);
+  GREYAppStateTrackerObject *object = TRACK_STATE_FOR_OBJECT(kGREYPendingDrawLayoutPass, self);
   // Next runloop drain will perform the draw pass.
   dispatch_async(dispatch_get_main_queue(), ^ {
-    UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYPendingDrawLayoutPass, elementID);
+    UNTRACK_STATE_FOR_OBJECT(kGREYPendingDrawLayoutPass, object);
   });
   INVOKE_ORIGINAL_IMP1(void, @selector(greyswizzled_setNeedsDisplayInRect:), rect);
 }
 
 - (void)greyswizzled_setNeedsDisplay {
-  NSString *elementID = TRACK_STATE_FOR_ELEMENT(kGREYPendingDrawLayoutPass, self);
+  GREYAppStateTrackerObject *object = TRACK_STATE_FOR_OBJECT(kGREYPendingDrawLayoutPass, self);
   // Next runloop drain will perform the draw pass.
   dispatch_async(dispatch_get_main_queue(), ^ {
-    UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYPendingDrawLayoutPass, elementID);
+    UNTRACK_STATE_FOR_OBJECT(kGREYPendingDrawLayoutPass, object);
   });
   INVOKE_ORIGINAL_IMP(void, @selector(greyswizzled_setNeedsDisplay));
 }
 
 - (void)greyswizzled_setNeedsLayout {
-  NSString *elementID = TRACK_STATE_FOR_ELEMENT(kGREYPendingDrawLayoutPass, self);
+  GREYAppStateTrackerObject *object = TRACK_STATE_FOR_OBJECT(kGREYPendingDrawLayoutPass, self);
   // Next runloop drain will perform the draw pass.
   dispatch_async(dispatch_get_main_queue(), ^ {
-    UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYPendingDrawLayoutPass, elementID);
+    UNTRACK_STATE_FOR_OBJECT(kGREYPendingDrawLayoutPass, object);
   });
   INVOKE_ORIGINAL_IMP(void, @selector(greyswizzled_setNeedsLayout));
 }
 
 - (void)greyswizzled_setNeedsUpdateConstraints {
-  NSString *elementID = TRACK_STATE_FOR_ELEMENT(kGREYPendingDrawLayoutPass, self);
+  GREYAppStateTrackerObject *object = TRACK_STATE_FOR_OBJECT(kGREYPendingDrawLayoutPass, self);
   // Next runloop drain will perform the draw pass.
   dispatch_async(dispatch_get_main_queue(), ^ {
-    UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYPendingDrawLayoutPass, elementID);
+    UNTRACK_STATE_FOR_OBJECT(kGREYPendingDrawLayoutPass, object);
   });
   INVOKE_ORIGINAL_IMP(void, @selector(greyswizzled_setNeedsUpdateConstraints));
 }

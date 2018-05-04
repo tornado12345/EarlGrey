@@ -14,13 +14,13 @@
 // limitations under the License.
 //
 
-#import <EarlGrey/GREYElementInteraction.h>
-#import <EarlGrey/GREYExposed.h>
-#import <EarlGrey/GREYMatcher.h>
-#import <EarlGrey/GREYMatchers.h>
-#import <EarlGrey/GREYStringDescription.h>
 #import <OCMock/OCMock.h>
 
+#import "Common/GREYAppleInternals.h"
+#import <EarlGrey/GREYElementInteraction.h>
+#import <EarlGrey/GREYMatcher.h>
+#import <EarlGrey/GREYMatchers.h>
+#import "Matcher/GREYStringDescription.h"
 #import "GREYBaseTest.h"
 
 #pragma mark - Test Helpers
@@ -335,18 +335,23 @@
   XCTAssertFalse([focusMatcher matches:customUIView], @"View should not be focused");
 }
 
-- (void)testMatchingTestPass {
+- (void)testTextMatcherPass {
   UILabel *testLabel = [[UILabel alloc] init];
   [testLabel setText:@"display text"];
   id<GREYMatcher> textMatcher = grey_text(@"display text");
   XCTAssertTrue([textMatcher matches:testLabel], @"Matching text should return true");
 }
 
-- (void)testMatchingTestFail {
+- (void)testTextMatcherFail {
   UILabel *testLabel = [[UILabel alloc] init];
   [testLabel setText:@"display text"];
+  id<GREYDescription> failureDesc = [[GREYStringDescription alloc] init];
   id<GREYMatcher> textMatcher = grey_text(@"incorrect display text");
-  XCTAssertFalse([textMatcher matches:testLabel], @"Non-matching text should return false");
+  XCTAssertFalse([textMatcher matches:testLabel describingMismatchTo:failureDesc],
+                 @"Non-matching text should return false");
+  NSRange failureMessageRange =
+      [[failureDesc description] rangeOfString:@"hasText('incorrect display text')"];
+  XCTAssertNotEqual(failureMessageRange.location, NSNotFound);
 }
 
 - (void)testBadObjectTypeFail {
@@ -597,6 +602,58 @@
                  @"Element must is not be on top-right.");
 }
 
+- (void)testLayoutMatcherFailsWhenNoReferenceElementMatched {
+  // Prepare a window and add a view not matching reference element matcher to it.
+  UIWindow *window = [[UIWindow alloc] init];
+  UIView *view = [[UIView alloc] init];
+  [window addSubview:view];
+
+  // Prepare mocks for test.
+  [[[self.mockSharedApplication stub] andReturn:@[window]] windows];
+
+  // Prepare constraint.
+  NSArray *constraints = @[[GREYLayoutConstraint layoutConstraintForDirection:kGREYLayoutDirectionUp
+                                                         andMinimumSeparation:0]];
+
+  // Reference element matcher not matching any elements.
+  id referenceMatcher = grey_accessibilityID(@"does not exist");
+
+  XCTAssertThrowsSpecificNamed([[GREYMatchers matcherForConstraints:constraints
+                                         toReferenceElementMatching:referenceMatcher] matches:view],
+                               GREYFrameworkException,
+                               kGREYNoMatchingElementException,
+                               @"Matcher for layout constraints failed: no UI element matching "
+                               @"reference element matcher was found.");
+}
+
+- (void)testLayoutMatcherFailsWhenMutipleReferenceElementsMatched {
+  // Prepare a window and add 2 views matching reference element matcher to it.
+  UIWindow *window = [[UIWindow alloc] init];
+  UIView *view = [[UIView alloc] init];
+  [window addSubview:view];
+  UIView *anotherView = [[UIView alloc] init];
+  [window addSubview:anotherView];
+
+  // Prepare mocks for test.
+  [[[self.mockSharedApplication stub] andReturn:@[window]] windows];
+
+  // Prepare constraint.
+  NSArray *constraints = @[[GREYLayoutConstraint layoutConstraintForDirection:kGREYLayoutDirectionUp
+                                                        andMinimumSeparation:0]];
+
+  // Reference element matcher matching multiple elements.
+  id referenceMatcher = grey_kindOfClass([UIView class]);
+
+  XCTAssertThrowsSpecificNamed([[GREYMatchers matcherForConstraints:constraints
+                                         toReferenceElementMatching:referenceMatcher] matches:view],
+                               GREYFrameworkException,
+                               kGREYMultipleElementsFoundException,
+                               @"Matcher for layout constraints failed: multiple UI elements "
+                               @"matching reference element matcher were found. Use "
+                               @"grey_allOf(...) to create a more specific reference element "
+                               @"matcher.");
+}
+
 - (void)testSwitchInOFFStateMatcher {
   UISwitch *uiswitch = [[UISwitch alloc] init];
   [uiswitch setOn:NO];
@@ -609,6 +666,17 @@
   [uiswitch setOn:YES];
   XCTAssertFalse([[GREYMatchers matcherForSwitchWithOnState:NO] matches:uiswitch]);
   XCTAssertTrue([[GREYMatchers matcherForSwitchWithOnState:YES] matches:uiswitch]);
+}
+
+- (void)testTextFieldValueMatcher {
+  UITextField *textField = [[UITextField alloc] init];
+  textField.text = @"Foo";
+  id<GREYMatcher> matcher = grey_textFieldValue(@"Bar");
+  XCTAssertFalse([matcher matches:textField], @"TextField Test matcher should return false");
+  textField.text = @"Bar";
+  XCTAssertTrue([matcher matches:textField], @"TextField Test matcher should return true");
+  UIView *view = [[UIView alloc] init];
+  XCTAssertFalse([matcher matches:view], @"UIView does not have title");
 }
 
 @end

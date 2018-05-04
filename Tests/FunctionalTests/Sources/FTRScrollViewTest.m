@@ -14,9 +14,9 @@
 // limitations under the License.
 //
 
-#import <EarlGrey/GREYVisibilityChecker.h>
-
 #import "FTRBaseIntegrationTest.h"
+#import "Common/GREYVisibilityChecker.h"
+#import <EarlGrey/EarlGrey.h>
 
 @interface FTRScrollViewTest : FTRBaseIntegrationTest
 @end
@@ -185,7 +185,7 @@
         CGRect visibleRect = [GREYVisibilityChecker rectEnclosingVisibleAreaOfElement:view];
         visibleRect = [view.window convertRect:visibleRect fromWindow:nil];
         visibleRect = [view convertRect:visibleRect fromView:nil];
-        CGRect expectedVisibleRect = CGRectMake(0, 0, 320, 82);
+        CGRect expectedVisibleRect = CGRectMake(0, 0, view.superview.bounds.size.width, 82);
         GREYAssertTrue(CGRectEqualToRect(visibleRect, expectedVisibleRect),
                       @"rects must be equal");
         return YES;

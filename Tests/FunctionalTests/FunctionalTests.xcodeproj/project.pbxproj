@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		39175F1E2028CDC80096E2E1 /* FTRShakeTest.m in Sources */ = {isa = PBXBuildFile; fileRef = 39175F1D2028CDC80096E2E1 /* FTRShakeTest.m */; };
+		3FBDDF9A1F3D61870055E8F9 /* FTRLayoutViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 3FBDDF981F3D61870055E8F9 /* FTRLayoutViewController.m */; };
+		3FBDDF9B1F3D61870055E8F9 /* FTRLayoutViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = 3FBDDF991F3D61870055E8F9 /* FTRLayoutViewController.xib */; };
 		59467DF91C9373A50089498B /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 59467D801C9373A50089498B /* LICENSE */; };
 		59467DFB1C9373A50089498B /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 59467D851C9373A50089498B /* Default-568h@2x.png */; };
 		59467DFC1C9373A50089498B /* Default-667@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 59467D861C9373A50089498B /* Default-667@2x.png */; };
@@ -105,6 +108,9 @@
 		61E4E0B31D7559A9007F9EE6 /* FTRImageViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 61E4E0B11D7559A9007F9EE6 /* FTRImageViewController.m */; };
 		61E4E0B41D7559A9007F9EE6 /* FTRImageViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = 61E4E0B21D7559A9007F9EE6 /* FTRImageViewController.xib */; };
 		61E4E0C31D755A9B007F9EE6 /* FTRPinchViewTest.m in Sources */ = {isa = PBXBuildFile; fileRef = 61E4E0C11D755A5C007F9EE6 /* FTRPinchViewTest.m */; };
+		D210ED941E72214A00978B9E /* FTRMultiFingerSwipeTest.m in Sources */ = {isa = PBXBuildFile; fileRef = D210ED931E72214A00978B9E /* FTRMultiFingerSwipeTest.m */; };
+		D210ED9D1E733EE400978B9E /* FTRMultiFingerSwipeGestureRecognizerViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = D210ED9B1E733EE400978B9E /* FTRMultiFingerSwipeGestureRecognizerViewController.m */; };
+		D210ED9E1E733EE400978B9E /* FTRMultiFingerSwipeGestureRecognizerViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = D210ED9C1E733EE400978B9E /* FTRMultiFingerSwipeGestureRecognizerViewController.xib */; };
 		FD193FF21BBDDBE800153959 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FD193FF11BBDDBE800153959 /* CoreFoundation.framework */; };
 		FD193FF41BBDDBED00153959 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FD193FF31BBDDBED00153959 /* Foundation.framework */; };
 		FD193FF61BBDDBF500153959 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FD193FF51BBDDBF500153959 /* CoreGraphics.framework */; };
@@ -192,6 +198,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		39175F1D2028CDC80096E2E1 /* FTRShakeTest.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FTRShakeTest.m; sourceTree = "<group>"; };
+		3FBDDF971F3D61870055E8F9 /* FTRLayoutViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FTRLayoutViewController.h; sourceTree = "<group>"; };
+		3FBDDF981F3D61870055E8F9 /* FTRLayoutViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FTRLayoutViewController.m; sourceTree = "<group>"; };
+		3FBDDF991F3D61870055E8F9 /* FTRLayoutViewController.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = FTRLayoutViewController.xib; sourceTree = "<group>"; };
 		59467D5B1C9373A50089498B /* FTRAccessibilityTest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FTRAccessibilityTest.m; sourceTree = "<group>"; };
 		59467D5C1C9373A50089498B /* FTRActionSheetTest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FTRActionSheetTest.m; sourceTree = "<group>"; };
 		59467D5D1C9373A50089498B /* FTRActivityIndicatorTest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FTRActivityIndicatorTest.m; sourceTree = "<group>"; };
@@ -323,6 +333,10 @@
 		61E4E0B11D7559A9007F9EE6 /* FTRImageViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FTRImageViewController.m; sourceTree = "<group>"; };
 		61E4E0B21D7559A9007F9EE6 /* FTRImageViewController.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; path = FTRImageViewController.xib; sourceTree = "<group>"; };
 		61E4E0C11D755A5C007F9EE6 /* FTRPinchViewTest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FTRPinchViewTest.m; sourceTree = "<group>"; };
+		D210ED931E72214A00978B9E /* FTRMultiFingerSwipeTest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FTRMultiFingerSwipeTest.m; sourceTree = "<group>"; };
+		D210ED9A1E733EE400978B9E /* FTRMultiFingerSwipeGestureRecognizerViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FTRMultiFingerSwipeGestureRecognizerViewController.h; sourceTree = "<group>"; };
+		D210ED9B1E733EE400978B9E /* FTRMultiFingerSwipeGestureRecognizerViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; indentWidth = 2; lastKnownFileType = sourcecode.c.objc; path = FTRMultiFingerSwipeGestureRecognizerViewController.m; sourceTree = "<group>"; tabWidth = 2; };
+		D210ED9C1E733EE400978B9E /* FTRMultiFingerSwipeGestureRecognizerViewController.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; path = FTRMultiFingerSwipeGestureRecognizerViewController.xib; sourceTree = "<group>"; };
 		FD193F2C1BBDDA4F00153959 /* FunctionalTestRig.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FunctionalTestRig.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FD193FF11BBDDBE800153959 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 		FD193FF31BBDDBED00153959 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -330,7 +344,6 @@
 		FD193FF71BBDDBFB00153959 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		FD193FF91BBDDC0000153959 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		FD387B391CA9C5E200958AEE /* FTRSwiftTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = FTRSwiftTests.swift; path = Sources/FTRSwiftTests.swift; sourceTree = "<group>"; };
-		FD387B3C1CA9C60D00958AEE /* FunctionalTestRig-Bridging-Header.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "FunctionalTestRig-Bridging-Header.h"; path = "Sources/FunctionalTestRig-Bridging-Header.h"; sourceTree = "<group>"; };
 		FD387B411CA9C63900958AEE /* EarlGreyFunctionalSwiftTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EarlGreyFunctionalSwiftTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		FD5470D61BBDE0A9000661FD /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = ../../../../../../../../../System/Library/Frameworks/IOKit.framework; sourceTree = "<group>"; };
 		FD5470F11BBDECBB000661FD /* EarlGreyFunctionalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = EarlGreyFunctionalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -436,6 +449,8 @@
 				59467D7C1C9373A50089498B /* FTRUITableViewTest.m */,
 				59467D7D1C9373A50089498B /* FTRUIWebViewTest.m */,
 				59467D7E1C9373A50089498B /* FTRVisibilityTest.m */,
+				D210ED931E72214A00978B9E /* FTRMultiFingerSwipeTest.m */,
+				39175F1D2028CDC80096E2E1 /* FTRShakeTest.m */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -517,6 +532,9 @@
 				61E4E0B01D7559A9007F9EE6 /* FTRImageViewController.h */,
 				61E4E0B11D7559A9007F9EE6 /* FTRImageViewController.m */,
 				61E4E0B21D7559A9007F9EE6 /* FTRImageViewController.xib */,
+				3FBDDF971F3D61870055E8F9 /* FTRLayoutViewController.h */,
+				3FBDDF981F3D61870055E8F9 /* FTRLayoutViewController.m */,
+				3FBDDF991F3D61870055E8F9 /* FTRLayoutViewController.xib */,
 				59467DB21C9373A50089498B /* FTRMainViewController.h */,
 				59467DB31C9373A50089498B /* FTRMainViewController.m */,
 				59467DB41C9373A50089498B /* FTRMainViewController.xib */,
@@ -555,6 +573,9 @@
 				59467DD51C9373A50089498B /* FTRWebViewController.m */,
 				59467DD61C9373A50089498B /* FTRWebViewController.xib */,
 				59467DD71C9373A50089498B /* main.m */,
+				D210ED9A1E733EE400978B9E /* FTRMultiFingerSwipeGestureRecognizerViewController.h */,
+				D210ED9B1E733EE400978B9E /* FTRMultiFingerSwipeGestureRecognizerViewController.m */,
+				D210ED9C1E733EE400978B9E /* FTRMultiFingerSwipeGestureRecognizerViewController.xib */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -600,7 +621,6 @@
 			isa = PBXGroup;
 			children = (
 				FD8277DE1D677D9F00C7C2AD /* EarlGrey.swift */,
-				FD387B3C1CA9C60D00958AEE /* FunctionalTestRig-Bridging-Header.h */,
 				FD387B391CA9C5E200958AEE /* FTRSwiftTests.swift */,
 			);
 			name = SwiftSources;
@@ -731,6 +751,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				59467E0F1C9373A50089498B /* FTRAnimationViewController.xib in Resources */,
+				3FBDDF9B1F3D61870055E8F9 /* FTRLayoutViewController.xib in Resources */,
 				59467DFC1C9373A50089498B /* Default-667@2x.png in Resources */,
 				59467E031C9373A50089498B /* ic_local_cafe_48pt@3x.png in Resources */,
 				59467E001C9373A50089498B /* Default@3x.png in Resources */,
@@ -739,6 +760,7 @@
 				59467E1E1C9373A50089498B /* FTRNetworkTestViewController.xib in Resources */,
 				59467E041C9373A50089498B /* testpage.html in Resources */,
 				59467E161C9373A50089498B /* FTRCollectionViewController.xib in Resources */,
+				D210ED9E1E733EE400978B9E /* FTRMultiFingerSwipeGestureRecognizerViewController.xib in Resources */,
 				59467DFD1C9373A50089498B /* Default-736h@3x.png in Resources */,
 				59467E2B1C9373A50089498B /* FTRTableViewController.xib in Resources */,
 				59467DF91C9373A50089498B /* LICENSE in Resources */,
@@ -795,6 +817,7 @@
 				61E4E0B31D7559A9007F9EE6 /* FTRImageViewController.m in Sources */,
 				59467E691C9373F00089498B /* FTRAppDelegate.m in Sources */,
 				59467E6B1C9373F00089498B /* FTRBasicViewController.m in Sources */,
+				3FBDDF9A1F3D61870055E8F9 /* FTRLayoutViewController.m in Sources */,
 				59467E6E1C9373F00089498B /* FTRCollectionViewCell.m in Sources */,
 				59467E711C9373F00089498B /* FTRCollectionViewController.m in Sources */,
 				59467E741C9373F00089498B /* FTRCollectionViewLayout.m in Sources */,
@@ -803,6 +826,7 @@
 				59467E791C9373F00089498B /* FTRMainViewController.m in Sources */,
 				59467E7C1C9373F00089498B /* FTRNetworkProxy.m in Sources */,
 				59467E7E1C9373F00089498B /* FTRNetworkTestViewController.m in Sources */,
+				D210ED9D1E733EE400978B9E /* FTRMultiFingerSwipeGestureRecognizerViewController.m in Sources */,
 				59467E811C9373F00089498B /* FTRPickerViewController.m in Sources */,
 				59467E841C9373F00089498B /* FTRPresentedViewController.m in Sources */,
 				59467E871C9373F00089498B /* FTRRotatedViewsViewController.m in Sources */,
@@ -847,6 +871,7 @@
 				59467E421C9373B90089498B /* FTRCollectionViewTest.m in Sources */,
 				59467E431C9373B90089498B /* FTRErrorAPITest.m in Sources */,
 				59467E451C9373B90089498B /* FTRFailureHandler.m in Sources */,
+				39175F1E2028CDC80096E2E1 /* FTRShakeTest.m in Sources */,
 				59467E461C9373B90089498B /* FTRGeometryTest.m in Sources */,
 				59467E471C9373B90089498B /* FTRGestureTest.m in Sources */,
 				59467E481C9373B90089498B /* FTRKeyboardKeysTest.m in Sources */,
@@ -854,6 +879,7 @@
 				59467E4A1C9373B90089498B /* FTRMatcherTest.m in Sources */,
 				59467E4B1C9373B90089498B /* FTRNetworkTest.m in Sources */,
 				61E4E0C31D755A9B007F9EE6 /* FTRPinchViewTest.m in Sources */,
+				D210ED941E72214A00978B9E /* FTRMultiFingerSwipeTest.m in Sources */,
 				59467E4C1C9373B90089498B /* FTROrientationChangeTest.m in Sources */,
 				61784D7C1DB6F4AB00054372 /* FTRAssertionHandler.m in Sources */,
 				59467E4D1C9373B90089498B /* FTROrientationPortraitOnlyChangeTest.m in Sources */,
@@ -920,6 +946,7 @@
 					"$(inherited)",
 				);
 				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ../../EarlGrey/;
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -935,6 +962,7 @@
 					"-Wextra",
 					"-Wconstant-conversion",
 					"-Wconversion",
+					"-Wdocumentation",
 					"-Wenum-conversion",
 					"-Wint-conversion",
 					"-Wmissing-prototypes",
@@ -965,6 +993,7 @@
 				GCC_INSTRUMENT_PROGRAM_FLOW_ARCS = YES;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				HEADER_SEARCH_PATHS = ../../EarlGrey/;
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				ONLY_ACTIVE_ARCH = YES;
@@ -978,10 +1007,11 @@
 				WARNING_CFLAGS = (
 					"-Werror",
 					"-Wall",
-					"-Wextra",
 					"-Wconstant-conversion",
 					"-Wconversion",
+					"-Wdocumentation",
 					"-Wenum-conversion",
+					"-Wextra",
 					"-Wint-conversion",
 					"-Wmissing-prototypes",
 					"-Wno-unused-parameter",
@@ -1065,7 +1095,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OBJC_BRIDGING_HEADER = "Sources/FunctionalTestRig-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FunctionalTestRig.app/FunctionalTestRig";
 				WARNING_CFLAGS = "$(inherited)";
@@ -1105,7 +1135,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OBJC_BRIDGING_HEADER = "Sources/FunctionalTestRig-Bridging-Header.h";
+				SWIFT_OBJC_BRIDGING_HEADER = "";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FunctionalTestRig.app/FunctionalTestRig";
 				WARNING_CFLAGS = "$(inherited)";
 			};

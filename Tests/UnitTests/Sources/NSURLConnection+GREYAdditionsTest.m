@@ -14,15 +14,19 @@
 // limitations under the License.
 //
 
+#import <OCMock/OCMock.h>
+#include <objc/runtime.h>
+
+#import "Additions/NSObject+GREYAdditions.h"
+#import "Additions/NSURLConnection+GREYAdditions.h"
 #import <EarlGrey/GREYCondition.h>
 #import <EarlGrey/GREYUIThreadExecutor.h>
-#import <EarlGrey/NSObject+GREYAdditions.h>
-#import <EarlGrey/NSURLConnection+GREYAdditions.h>
-#import <OCMock/OCMock.h>
-#import <objc/runtime.h>
-
 #import "GREYBaseTest.h"
 #import "GREYExposedForTesting.h"
+
+@interface NSURLConnection (NSURLConnection_GREYAdditionsTest)
+- (GREYAppStateTrackerObject *)objectForConnection;
+@end
 
 // Class that performs swizzled operations in dealloc to ensure they don't track.
 @interface NSURLConnectionDealloc : NSURLConnection
@@ -63,9 +67,9 @@
     _capturedPendingObject = object;
   };
   [[[[_mockGREYAppStateTracker expect] andDo:blockPending] andForwardToRealObject]
-      trackState:kGREYPendingNetworkRequest forElement:OCMOCK_ANY];
+      trackState:kGREYPendingNetworkRequest forObject:OCMOCK_ANY];
   [[[_mockGREYAppStateTracker expect] andForwardToRealObject]
-      untrackState:kGREYPendingNetworkRequest forElementWithID:OCMOCK_ANY];
+      untrackState:kGREYPendingNetworkRequest forObject:OCMOCK_ANY];
 }
 
 - (void)tearDown {
@@ -230,7 +234,8 @@
 - (void)testCreatingNewConnectionIsTracked {
   NSURLRequest *req = [NSURLRequest requestWithURL:[NSURL URLWithString:@"www.google.com"]];
   NSURLConnection *conn = [NSURLConnection connectionWithRequest:req delegate:nil];
-  GREYAppState state = [[GREYAppStateTracker sharedInstance] grey_lastKnownStateForElement:conn];
+  GREYAppState state =
+      [[GREYAppStateTracker sharedInstance] grey_lastKnownStateForObject:conn];
   XCTAssertTrue(state & kGREYPendingNetworkRequest);
 }
 

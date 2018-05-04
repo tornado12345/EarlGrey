@@ -17,6 +17,8 @@
 #import <EarlGrey/GREYBaseAction.h>
 #import <EarlGrey/GREYConstants.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 /**
  *  Error domain used for pinch related NSError objects.
  */
@@ -30,21 +32,29 @@ typedef NS_ENUM(NSInteger, GREYPinchErrorCode) {
 };
 
 /**
- *  A @c GREYAction that pinches the view on which it is called.
+ *  A @c GREYAction that performs the pinch gesture on the view on which it is called.
  */
 @interface GREYPinchAction : GREYBaseAction
 
 /**
  *  Performs a pinch action in the given @c direction for the @c duration. The start of outward
- *  pinch is from the center of the view and stops before 20% margin of the view's
- *  width or height, on either side.
- *  For an inward pinch the start point is at a 20% margin of the view's width or height on either
- *  side and stops at the center.
+ *  pinch is from the center of the view and stops before 20% margin of the view's bounding rect.
  *
- *  @param direction The direction of the pinch.
- *  @param duration  The time interval for which the pinch takes place.
+ *  For an inward pinch the start point is at a 20% margin of the view's bounding rect on either
+ *  side and stops at the center. The default angle of the pinch action is 30 degrees to closely
+ *  match the average pinch angle of a natural right handed pinch.
  *
- *  @returns An instance of @c GREYPinchAction, initialized with a provided direction and duration.
+ *  @param direction  The direction of the pinch.
+ *  @param duration   The time interval for which the pinch takes place.
+ *  @param pinchAngle Angle of the vector in radians to which the pinch direction is pointing.
+ *
+ *  @returns An instance of @c GREYPinchAction, initialized with a provided direction and
+ *           duration and angle.
  */
-- (instancetype)initWithDirection:(GREYPinchDirection)direction duration:(CFTimeInterval)duration;
+- (instancetype)initWithDirection:(GREYPinchDirection)direction
+                         duration:(CFTimeInterval)duration
+                       pinchAngle:(double)pinchAngle;
+
 @end
+
+NS_ASSUME_NONNULL_END

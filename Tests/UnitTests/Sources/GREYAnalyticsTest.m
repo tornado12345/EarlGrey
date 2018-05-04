@@ -14,14 +14,19 @@
 // limitations under the License.
 //
 
-#import <EarlGrey/GREYAnalytics.h>
-#import <EarlGrey/NSString+GREYAdditions.h>
+#import <OCMock/OCMock.h>
 
+#import "Additions/NSString+GREYAdditions.h"
+#import "Additions/XCTestCase+GREYAdditions.h"
+#import "Common/GREYAnalytics.h"
+#import "Common/GREYAnalyticsDelegate.h"
 #import "GREYBaseTest.h"
 #import "GREYExposedForTesting.h"
 
 @interface GREYAnalyticsTestDelegate : NSObject<GREYAnalyticsDelegate>
 
+@property(nonatomic, assign) NSInteger count;
+@property(nonatomic, strong) NSString *clientID;
 @property(nonatomic, strong) NSString *bundleID;
 @property(nonatomic, strong) NSString *subCategory;
 
@@ -30,11 +35,14 @@
 @implementation GREYAnalyticsTestDelegate
 
 - (void)trackEventWithTrackingID:(NSString *)trackingID
+                        clientID:(NSString *)clientID
                         category:(NSString *)category
-                     subCategory:(NSString *)subCategory
-                           value:(NSNumber *)valueOrNil {
+                          action:(NSString *)subCategory
+                           value:(NSString *)value {
+  _clientID = clientID;
   _bundleID = category;
   _subCategory = subCategory;
+  _count += 1;
 }
 
 @end
@@ -42,63 +50,79 @@
 @interface GREYAnalyticsTest : GREYBaseTest
 @end
 
-@implementation GREYAnalyticsTest
+@implementation GREYAnalyticsTest {
+  // Reference to the previous analytics delegate that this test overrides (used to restore later).
+  id<GREYAnalyticsDelegate> _previousDelegate;
+  // The test delegate that saves data passed in for verification.
+  GREYAnalyticsTestDelegate *_testDelegate;
+}
+
+- (void)setUp {
+  [super setUp];
+
+  _previousDelegate = [[GREYAnalytics sharedInstance] delegate];
+  _testDelegate = [[GREYAnalyticsTestDelegate alloc] init];
+  [[GREYAnalytics sharedInstance] setDelegate:_testDelegate];
+}
+
+- (void)tearDown {
+  [[GREYAnalytics sharedInstance] setDelegate:_previousDelegate];
+
+  [super tearDown];
+}
 
 - (void)testAnalyticsDelegateGetsAnonymizedBundleID {
   // Verify bundle ID is a non-empty string.
   NSString *bundleID = [[NSBundle mainBundle] bundleIdentifier];
   XCTAssertGreaterThan([bundleID length], 0u);
 
-  // Setup a test delegate and verify the bundle ID passed to it is anonymized.
-  id<GREYAnalyticsDelegate> previousDelegate = [[GREYAnalytics sharedInstance] delegate];
-  GREYAnalyticsTestDelegate *testDelegate = [[GREYAnalyticsTestDelegate alloc] init];
-  [[GREYAnalytics sharedInstance] setDelegate:testDelegate];
-  [[GREYAnalytics sharedInstance] didInvokeEarlGrey];
-  [[GREYAnalytics sharedInstance] grey_testCaseInstanceDidTearDown];
-  XCTAssertEqualObjects([bundleID grey_md5String], testDelegate.bundleID);
-  [[GREYAnalytics sharedInstance] setDelegate:previousDelegate];
+  [self greytest_simulateTestExecution];
+  XCTAssertEqualObjects([bundleID grey_md5String], _testDelegate.bundleID);
+  XCTAssertEqual(_testDelegate.count, 1);
 }
 
-- (void)testAnalyticsDelegateGetsTestCaseCount {
-  // Setup a test delegate.
-  id<GREYAnalyticsDelegate> previousDelegate = [[GREYAnalytics sharedInstance] delegate];
-  GREYAnalyticsTestDelegate *testDelegate = [[GREYAnalyticsTestDelegate alloc] init];
-  [[GREYAnalytics sharedInstance] setDelegate:testDelegate];
+- (void)testAnalyticsDelegateGetsTestCaseMD5 {
+  [self greytest_simulateTestExecution];
 
-  // Simulate execution of a test.
-  [[GREYAnalytics sharedInstance] didInvokeEarlGrey];
-  [[GREYAnalytics sharedInstance] grey_testCaseInstanceDidTearDown];
-
-  // Verify the testcase name includes a count.
-  XCTAssertTrue([[testDelegate.subCategory lowercaseString] hasPrefix:@"testcase_"]);
-  XCTAssertGreaterThanOrEqual(
-      [self greytest_getTestCaseCountFromSubCategory:testDelegate.subCategory], 1);
-  [[GREYAnalytics sharedInstance] setDelegate:previousDelegate];
+  // Verify the testcase name passed to the delegate is md5ed.
+  NSString *testCase = [NSString stringWithFormat:@"%@::%@",
+                                                  [self grey_testClassName],
+                                                  [self grey_testMethodName]];
+  NSString *testCaseId = [NSString stringWithFormat:@"TestCase_%@", [testCase grey_md5String]];
+  NSString *expectedTestCaseId = @"TestCase_5f844eaf0aeace73b955acc9f896800f";
+  XCTAssertEqualObjects(testCaseId, expectedTestCaseId);
+  XCTAssertEqualObjects(_testDelegate.subCategory, expectedTestCaseId);
+  XCTAssertEqual(_testDelegate.count, 1);
 }
 
-- (void)testAnalyticsDelegateTestCaseCountIncrements {
-  // Setup a test delegate.
-  id<GREYAnalyticsDelegate> previousDelegate = [[GREYAnalytics sharedInstance] delegate];
-  GREYAnalyticsTestDelegate *testDelegate = [[GREYAnalyticsTestDelegate alloc] init];
-  [[GREYAnalytics sharedInstance] setDelegate:testDelegate];
+- (void)testAnalyticsDelegateGetsAnonymousClientId {
+  NSString *fakeUUID = @"1234-1234-1234-1234";
+  id uuidMock = [OCMockObject mockForClass:[NSUUID class]];
+  [[[uuidMock stub] andReturn:fakeUUID] UUIDString];
+  id uuidClassMock = [OCMockObject mockForClass:[NSUUID class]];
+  [[[uuidClassMock stub] andReturn:uuidMock] UUID];
 
-  // Simulate execution of first test.
-  [[GREYAnalytics sharedInstance] didInvokeEarlGrey];
-  [[GREYAnalytics sharedInstance] grey_testCaseInstanceDidTearDown];
-  NSInteger firstTestCaseCount =
-      [self greytest_getTestCaseCountFromSubCategory:testDelegate.subCategory];
+  [self greytest_simulateTestExecution];
 
-  // Simulate execution of second test.
-  [[GREYAnalytics sharedInstance] didInvokeEarlGrey];
-  [[GREYAnalytics sharedInstance] grey_testCaseInstanceDidTearDown];
-  NSInteger secondTestCaseCount =
-      [self greytest_getTestCaseCountFromSubCategory:testDelegate.subCategory];
-  [[GREYAnalytics sharedInstance] setDelegate:previousDelegate];
-
-  XCTAssertEqual(secondTestCaseCount - firstTestCaseCount, 1);
+  // Verify the client ID passed to the delegate contains anonymous data.
+  // Note that this string must be modified if the test class name, test case name or the test app's
+  // bundle ID changes.
+  NSString *expectedClientId = fakeUUID;
+  XCTAssertEqualObjects(_testDelegate.clientID, expectedClientId,
+                        @"Either the user ID is not being anonymized or the test class, test "
+                        @"method or test app's bundle ID has changed.");
+  XCTAssertEqual(_testDelegate.count, 1);
 }
 
 #pragma mark - Private
+
+/**
+ *  Simulates the test execution to trigger analytics.
+ */
+- (void)greytest_simulateTestExecution {
+  [[GREYAnalytics sharedInstance] didInvokeEarlGrey];
+  [[GREYAnalytics sharedInstance] grey_testCaseInstanceDidTearDown];
+}
 
 /**
  *  @return The testcase count present in the given Analytics Event sub-category value.

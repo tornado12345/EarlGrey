@@ -17,9 +17,9 @@
 #import "Synchronization/GREYNSTimerIdlingResource.h"
 
 #import "Common/GREYDefines.h"
-#import "Common/GREYPrivate.h"
+#import "Common/GREYThrowDefines.h"
+#import "Synchronization/GREYUIThreadExecutor+Internal.h"
 #import "Synchronization/GREYUIThreadExecutor.h"
-
 
 @implementation GREYNSTimerIdlingResource {
   NSString *_name;
@@ -39,8 +39,8 @@
 - (instancetype)initWithTimer:(NSTimer *)timer
                          name:(NSString *)name
                  removeOnIdle:(BOOL)removeOnIdle {
-  NSParameterAssert(timer);
-  NSParameterAssert(name);
+  GREYThrowOnNilParameter(timer);
+  GREYThrowOnNilParameter(name);
 
   self = [super init];
   if (self) {
@@ -58,7 +58,7 @@
 }
 
 - (NSString *)idlingResourceDescription {
-  return [NSString stringWithFormat:@"Waiting for timer %@ to fire(will fire after %g seconds)",
+  return [NSString stringWithFormat:@"Waiting for timer %@ to fire (next fire in %g seconds)",
              _trackedTimer, [_trackedTimer.fireDate timeIntervalSinceNow]];
 }
 

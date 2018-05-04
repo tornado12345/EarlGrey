@@ -13,7 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-require_relative '../lib/earlgrey'
+require 'earlgrey/cli'
+require 'earlgrey/extensions/earlgrey_yaml'
 require 'rspec'
 require 'tmpdir'
 require 'pry' # enables binding.pry

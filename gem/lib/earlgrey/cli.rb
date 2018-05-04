@@ -12,8 +12,8 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
-# rubocop:disable Metrics/LineLength
+require 'earlgrey/configure_earlgrey'
+require 'thor'
 module EarlGrey
   class CLI < Thor
     package_name 'EarlGrey'
@@ -36,8 +36,6 @@ module EarlGrey
     def install
       o = options.dup
 
-      # CLI will never use Cocoapod's `post_install do |installer|`
-      podfile_installer = nil
       opts = { swift: o[SWIFT], carthage: o[CARTHAGE], swift_version: o[SWIFT_VERSION] }
 
       # Use target as the default Scheme name.
@@ -46,7 +44,7 @@ module EarlGrey
       o[PROJECT] ||= Dir.glob(File.join(Dir.pwd, '*.xcodeproj')).first
       raise 'No project found' unless o[PROJECT]
 
-      EarlGrey.configure_for_earlgrey podfile_installer, o[PROJECT], o[TARGET], o[SCHEME], opts
+      EarlGrey.configure_for_earlgrey o[PROJECT], o[TARGET], o[SCHEME], opts
     end
   end
 end

@@ -21,13 +21,20 @@
 #import "Additions/NSObject+GREYAdditions.h"
 #import "Assertion/GREYAssertion.h"
 #import "Assertion/GREYAssertionDefines.h"
+#import "Assertion/GREYAssertions+Internal.h"
 #import "Assertion/GREYAssertions.h"
 #import "Common/GREYConfiguration.h"
 #import "Common/GREYDefines.h"
-#import "Common/GREYPrivate.h"
+#import "Common/GREYError+Internal.h"
+#import "Common/GREYError.h"
+#import "Common/GREYErrorConstants.h"
+#import "Common/GREYFatalAsserts.h"
+#import "Common/GREYLogger.h"
+#import "Common/GREYObjectFormatter.h"
 #import "Common/GREYStopwatch.h"
-#import "Common/GREYVerboseLogger.h"
+#import "Common/GREYThrowDefines.h"
 #import "Core/GREYElementFinder.h"
+#import "Core/GREYElementInteraction+Internal.h"
 #import "Core/GREYInteractionDataSource.h"
 #import "Exception/GREYFrameworkException.h"
 #import "Matcher/GREYAllOf.h"
@@ -36,25 +43,6 @@
 #import "Provider/GREYElementProvider.h"
 #import "Provider/GREYUIWindowProvider.h"
 #import "Synchronization/GREYUIThreadExecutor.h"
-
-/**
- *  Extern variable specifying the error domain for GREYElementInteraction.
- */
-NSString *const kGREYInteractionErrorDomain = @"com.google.earlgrey.ElementInteractionErrorDomain";
-NSString *const kGREYWillPerformActionNotification = @"GREYWillPerformActionNotification";
-NSString *const kGREYDidPerformActionNotification = @"GREYDidPerformActionNotification";
-NSString *const kGREYWillPerformAssertionNotification = @"GREYWillPerformAssertionNotification";
-NSString *const kGREYDidPerformAssertionNotification = @"GREYDidPerformAssertionNotification";
-
-/**
- *  Extern variables specifying the user info keys for any notifications.
- */
-NSString *const kGREYActionUserInfoKey = @"kGREYActionUserInfoKey";
-NSString *const kGREYActionElementUserInfoKey = @"kGREYActionElementUserInfoKey";
-NSString *const kGREYActionErrorUserInfoKey = @"kGREYActionErrorUserInfoKey";
-NSString *const kGREYAssertionUserInfoKey = @"kGREYAssertionUserInfoKey";
-NSString *const kGREYAssertionElementUserInfoKey = @"kGREYAssertionElementUserInfoKey";
-NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKey";
 
 @interface GREYElementInteraction() <GREYInteractionDataSource>
 @end
@@ -71,7 +59,7 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
 @synthesize dataSource;
 
 - (instancetype)initWithElementMatcher:(id<GREYMatcher>)elementMatcher {
-  NSParameterAssert(elementMatcher);
+  GREYThrowOnNilParameter(elementMatcher);
 
   self = [super init];
   if (self) {
@@ -92,25 +80,15 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
   return self;
 }
 
-/**
- *  Searches for UI elements within the root views and returns all matched UI elements. The given
- *  search action is performed until an element is found.
- *
- *  @param timeout The amount of time during which search actions must be performed to find an
- *                 element.
- *  @param error   The error populated on failure. If an element was found and returned when using
- *                 the search actions then any action or timeout errors that happened in the
- *                 previous search are ignored. However, if an element is not found, the error
- *                 will be propagated.
- *
- *  @return An array of matched UI elements in the data source. If no UI element is found in
- *          @c timeout seconds, a timeout error will be produced and no UI element will be returned.
- */
+#pragma mark - Package Internal
+
 - (NSArray *)matchedElementsWithTimeout:(CFTimeInterval)timeout error:(__strong NSError **)error {
-  NSParameterAssert(error);
+  GREYFatalAssert(error);
+
   GREYLogVerbose(@"Scanning for element matching: %@", _elementMatcher);
   id<GREYInteractionDataSource> strongDataSource = [self dataSource];
-  NSAssert(strongDataSource, @"strongDataSource must be set before fetching UI elements");
+  GREYFatalAssertWithMessage(strongDataSource,
+                             @"strongDataSource must be set before fetching UI elements");
 
   GREYElementProvider *entireRootHierarchyProvider =
       [GREYElementProvider providerWithRootProvider:[strongDataSource rootElementProvider]];
@@ -121,6 +99,9 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
   GREYElementFinder *elementFinder = [[GREYElementFinder alloc] initWithMatcher:elementMatcher];
   NSError *searchActionError = nil;
   CFTimeInterval timeoutTime = CACurrentMediaTime() + timeout;
+  // We want the search action to be performed at least once.
+  static unsigned short kMinimumIterationAttempts = 1;
+  unsigned short numIterations = 0;
   BOOL timedOut = NO;
   while (YES) {
     @autoreleasepool {
@@ -135,50 +116,73 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
       if (elements.count > 0) {
         return elements;
       } else if (!_searchAction) {
-        if (error) {
-          NSString *desc =
-              @"Interaction cannot continue because the desired element was not found.";
-          *error = [NSError errorWithDomain:kGREYInteractionErrorDomain
-                                       code:kGREYInteractionElementNotFoundErrorCode
-                                   userInfo:@{ NSLocalizedDescriptionKey : desc }];
-        }
+        NSString *description =
+            @"Interaction cannot continue because the desired element was not found.";
+        GREYPopulateErrorOrLog(error,
+                               kGREYInteractionErrorDomain,
+                               kGREYInteractionElementNotFoundErrorCode,
+                               description);
         return nil;
       } else if (searchActionError) {
         break;
       }
 
-      CFTimeInterval currentTime = CACurrentMediaTime();
-      if (currentTime >= timeoutTime) {
-        timedOut = YES;
+      // After a lookup, we should check if we have timed out. This is so that we can quit
+      // appropriately after a timeout.
+      timedOut = (timeoutTime - CACurrentMediaTime()) < 0;
+      if (timedOut && numIterations >= kMinimumIterationAttempts) {
         break;
       }
-      // Keep applying search action.
+
+      // Try to uncover the element by applying the search action.
       id<GREYInteraction> interaction =
           [[GREYElementInteraction alloc] initWithElementMatcher:_searchActionElementMatcher];
       // Don't fail if this interaction error's out. It might still have revealed the element
       // we're looking for.
       [interaction performAction:_searchAction error:&searchActionError];
+
+      // After a search action, if we have timed out, then we drain the thread by passing 0.
+      // Otherwise, passing negative will throw an exception.
+      CFTimeInterval timeRemaining = timeoutTime - CACurrentMediaTime();
+      if (timeRemaining < 0) {
+        timeRemaining = 0;
+      }
       // Drain here so that search at the beginning of the loop looks at stable UI.
-      [[GREYUIThreadExecutor sharedInstance] drainUntilIdle];
+      BOOL successful =
+          [[GREYUIThreadExecutor sharedInstance] drainUntilIdleWithTimeout:timeRemaining];
+      // If not @c successful, then quit.
+      if (!successful) {
+        timedOut = YES;
+        break;
+      }
+      ++numIterations;
     }
   }
 
-  NSDictionary *userInfo = nil;
   if (searchActionError) {
-    userInfo = @{ NSUnderlyingErrorKey : searchActionError };
+    GREYPopulateNestedErrorOrLog(error,
+                                 kGREYInteractionErrorDomain,
+                                 kGREYInteractionElementNotFoundErrorCode,
+                                 @"Search action failed",
+                                 searchActionError);
   } else if (timedOut) {
     CFTimeInterval interactionTimeout =
         GREY_CONFIG_DOUBLE(kGREYConfigKeyInteractionTimeoutDuration);
-    NSString *desc = [NSString stringWithFormat:@"Interaction timed out after %g seconds while "
-                                                @"searching for element.", interactionTimeout];
-    NSError *timeoutError = [NSError errorWithDomain:kGREYInteractionErrorDomain
-                                                code:kGREYInteractionTimeoutErrorCode
-                                            userInfo:@{ NSLocalizedDescriptionKey : desc }];
-    userInfo = @{ NSUnderlyingErrorKey : timeoutError };
+    NSString *description = [NSString stringWithFormat:@"Interaction timed out after %g seconds "
+                                                       @"while searching for element.",
+                                                       interactionTimeout];
+
+    NSError *timeoutError = GREYErrorMake(kGREYInteractionErrorDomain,
+                                          kGREYInteractionTimeoutErrorCode,
+                                          description);
+
+    GREYPopulateNestedErrorOrLog(error,
+                                 kGREYInteractionErrorDomain,
+                                 kGREYInteractionElementNotFoundErrorCode,
+                                 @"",
+                                 timeoutError);
   }
-  *error = [NSError errorWithDomain:kGREYInteractionErrorDomain
-                               code:kGREYInteractionElementNotFoundErrorCode
-                           userInfo:userInfo];
+
   return nil;
 }
 
@@ -198,8 +202,9 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
 }
 
 - (instancetype)performAction:(id<GREYAction>)action error:(__strong NSError **)errorOrNil {
-  NSParameterAssert(action);
-  I_CHECK_MAIN_THREAD();
+  GREYThrowOnNilParameterWithMessage(action, @"action can't be nil.");
+  GREYFatalAssertMainThread();
+
   GREYLogVerbose(@"--Action started--");
   GREYLogVerbose(@"Action to perform: %@", [action name]);
   GREYStopwatch *stopwatch = [[GREYStopwatch alloc] init];
@@ -208,7 +213,6 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
   @autoreleasepool {
     NSError *executorError;
     __block NSError *actionError = nil;
-    __weak __typeof__(self) weakSelf = self;
 
     // Create the user info dictionary for any notificatons and set it up with the action.
     NSMutableDictionary *actionUserInfo = [[NSMutableDictionary alloc] init];
@@ -220,11 +224,11 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
 
     // Assign a flag that provides info if the interaction being performed failed.
     __block BOOL interactionFailed = NO;
-    BOOL executionSucceeded =
-        [[GREYUIThreadExecutor sharedInstance] executeSyncWithTimeout:interactionTimeout
-                                                                block:^{
+    __weak __typeof__(self) weakSelf = self;
+
+    GREYExecBlock actionExecBlock = ^{
       __typeof__(self) strongSelf = weakSelf;
-      NSAssert(strongSelf, @"Must not be nil");
+      GREYFatalAssertWithMessage(strongSelf, @"Must not be nil");
 
       // Obtain all elements from the hierarchy and populate the passed error in case of
       // an element not being found.
@@ -252,18 +256,16 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
       [defaultNotificationCenter postNotificationName:kGREYWillPerformActionNotification
                                                object:nil
                                              userInfo:actionUserInfo];
-      GREYLogVerbose(@"Performing action: %@\n  with matcher: %@\n  with root matcher: %@",
+      GREYLogVerbose(@"Performing action: %@\n with matcher: %@\n with root matcher: %@",
                      [action name], _elementMatcher, _rootMatcher);
 
       if (element && ![action perform:element error:&actionError]) {
         interactionFailed = YES;
         // Action didn't succeed yet no error was set.
         if (!actionError) {
-          NSDictionary *userInfo =
-              @{ NSLocalizedDescriptionKey : @"Reason for action failure was not provided." };
-          actionError = [NSError errorWithDomain:kGREYInteractionErrorDomain
-                                            code:kGREYInteractionActionFailedErrorCode
-                                        userInfo:userInfo];
+          actionError = GREYErrorMake(kGREYInteractionErrorDomain,
+                                      kGREYInteractionActionFailedErrorCode,
+                                      @"Reason for action failure was not provided.");
         }
         // Add the error obtained from the action to the user info notification dictionary.
         [actionUserInfo setObject:actionError forKey:kGREYActionErrorUserInfoKey];
@@ -281,7 +283,12 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
                                    actionError:actionError
                           userProvidedOutError:nil];
       }
-    } error:&executorError];
+    };
+
+    BOOL executionSucceeded =
+        [[GREYUIThreadExecutor sharedInstance] executeSyncWithTimeout:interactionTimeout
+                                                                block:actionExecBlock
+                                                                error:&executorError];
 
     // Failure to execute due to timeout should be represented as interaction timeout.
     if (!executionSucceeded) {
@@ -290,13 +297,10 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
         NSString *actionTimeoutDesc =
             [NSString stringWithFormat:@"Failed to perform action within %g seconds.",
              interactionTimeout];
-        NSDictionary *userInfo = @{
-                                   NSUnderlyingErrorKey : executorError,
-                                   NSLocalizedDescriptionKey : actionTimeoutDesc,
-                                   };
-        actionError = [NSError errorWithDomain:kGREYInteractionErrorDomain
-                                          code:kGREYInteractionTimeoutErrorCode
-                                      userInfo:userInfo];
+        actionError = GREYNestedErrorMake(kGREYInteractionErrorDomain,
+                                          kGREYInteractionTimeoutErrorCode,
+                                          actionTimeoutDesc,
+                                          executorError);
       }
     }
 
@@ -331,8 +335,9 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
 }
 
 - (instancetype)assert:(id<GREYAssertion>)assertion error:(__strong NSError **)errorOrNil {
-  NSParameterAssert(assertion);
-  I_CHECK_MAIN_THREAD();
+  GREYThrowOnNilParameterWithMessage(assertion, @"assertion can't be nil.");
+  GREYFatalAssertMainThread();
+
   GREYLogVerbose(@"--Assertion started--");
   GREYLogVerbose(@"Assertion to perform: %@", [assertion name]);
   GREYStopwatch *stopwatch = [[GREYStopwatch alloc] init];
@@ -341,7 +346,6 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
   @autoreleasepool {
     NSError *executorError;
     __block NSError *assertionError = nil;
-    __weak __typeof__(self) weakSelf = self;
 
     NSNotificationCenter *defaultNotificationCenter = [NSNotificationCenter defaultCenter];
 
@@ -349,10 +353,11 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
         (CGFloat)GREY_CONFIG_DOUBLE(kGREYConfigKeyInteractionTimeoutDuration);
     // Assign a flag that provides info if the interaction being performed failed.
     __block BOOL interactionFailed = NO;
-    BOOL executionSucceeded =
-        [[GREYUIThreadExecutor sharedInstance] executeSyncWithTimeout:interactionTimeout block:^{
+    __weak __typeof__(self) weakSelf = self;
+
+    GREYExecBlock assertionExecBlock = ^{
       __typeof__(self) strongSelf = weakSelf;
-      NSAssert(strongSelf, @"strongSelf must not be nil");
+      GREYFatalAssertWithMessage(strongSelf, @"strongSelf must not be nil");
 
       // An error object that holds error due to element not found (if any). It is used only when
       // an assertion fails because element was nil. That's when we surface this error.
@@ -362,7 +367,7 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
       NSArray *elements = [strongSelf matchedElementsWithTimeout:interactionTimeout
                                                            error:&elementNotFoundError];
       id element = (elements.count != 0) ?
-          [strongSelf grey_uniqueElementInMatchedElements:elements andError:&assertionError] : nil;
+      [strongSelf grey_uniqueElementInMatchedElements:elements andError:&assertionError] : nil;
 
       // Create the user info dictionary for any notificatons and set it up with the assertion.
       NSMutableDictionary *assertionUserInfo = [[NSMutableDictionary alloc] init];
@@ -378,13 +383,13 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
         // error surfaces.
         multipleMatchesPresent =
             (assertionError.code == kGREYInteractionMultipleElementsMatchedErrorCode ||
-            assertionError.code == kGREYInteractionMatchedElementIndexOutOfBoundsErrorCode);
+             assertionError.code == kGREYInteractionMatchedElementIndexOutOfBoundsErrorCode);
         [assertionUserInfo setObject:assertionError forKey:kGREYAssertionErrorUserInfoKey];
       }
       [defaultNotificationCenter postNotificationName:kGREYWillPerformAssertionNotification
                                                object:nil
                                              userInfo:assertionUserInfo];
-      GREYLogVerbose(@"Performing assertion: %@\n  with matcher: %@\n  with root matcher: %@",
+      GREYLogVerbose(@"Performing assertion: %@\n with matcher: %@\n with root matcher: %@",
                      [assertion name], _elementMatcher, _rootMatcher);
 
       // In the case of an assertion, we can have a nil element present as well. For this purpose,
@@ -403,11 +408,9 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
         }
         // Assertion didn't succeed yet no error was set.
         if (!assertionError) {
-          NSDictionary *userInfo =
-              @{ NSLocalizedDescriptionKey : @"Reason for assertion failure was not provided." };
-          assertionError = [NSError errorWithDomain:kGREYInteractionErrorDomain
-                                               code:kGREYInteractionAssertionFailedErrorCode
-                                           userInfo:userInfo];
+          assertionError = GREYErrorMake(kGREYInteractionErrorDomain,
+                                         kGREYInteractionAssertionFailedErrorCode,
+                                         @"Reason for assertion failure was not provided.");
         }
         // Add the error obtained from the action to the user info notification dictionary.
         [assertionUserInfo setObject:assertionError forKey:kGREYAssertionErrorUserInfoKey];
@@ -427,7 +430,12 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
                                    assertionError:assertionError
                              userProvidedOutError:nil];
       }
-    } error:&executorError];
+    };
+
+    BOOL executionSucceeded =
+        [[GREYUIThreadExecutor sharedInstance] executeSyncWithTimeout:interactionTimeout
+                                                                block:assertionExecBlock
+                                                                error:&executorError];
 
     // Failure to execute due to timeout should be represented as interaction timeout.
     if (!executionSucceeded) {
@@ -436,25 +444,22 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
         NSString *assertionTimeoutDesc =
             [NSString stringWithFormat:@"Failed to execute assertion within %g seconds.",
              interactionTimeout];
-        NSDictionary *userInfo = @{
-                                   NSUnderlyingErrorKey : executorError,
-                                   NSLocalizedDescriptionKey : assertionTimeoutDesc,
-                                   };
-        assertionError = [NSError errorWithDomain:kGREYInteractionErrorDomain
-                                             code:kGREYInteractionTimeoutErrorCode
-                                         userInfo:userInfo];
+        assertionError = GREYNestedErrorMake(kGREYInteractionErrorDomain,
+                                             kGREYInteractionTimeoutErrorCode,
+                                             assertionTimeoutDesc,
+                                             executorError);
       }
     }
 
-    BOOL actionFailed = !executionSucceeded || interactionFailed;
-    if (actionFailed) {
+    BOOL assertionFailed = !executionSucceeded || interactionFailed;
+    if (assertionFailed) {
       [self grey_handleFailureOfAssertion:assertion
                            assertionError:assertionError
                      userProvidedOutError:errorOrNil];
     }
 
     [stopwatch stop];
-    if (actionFailed) {
+    if (assertionFailed) {
       GREYLogVerbose(@"Assertion failed: %@ with time: %f seconds",
                      [assertion name],
                      [stopwatch elapsedTime]);
@@ -472,13 +477,14 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
 }
 
 - (instancetype)assertWithMatcher:(id<GREYMatcher>)matcher error:(__strong NSError **)errorOrNil {
-  return [self assert:[GREYAssertions grey_createAssertionWithMatcher:matcher] error:errorOrNil];
+  id<GREYAssertion> assertion = [GREYAssertions grey_createAssertionWithMatcher:matcher];
+  return [self assert:assertion error:errorOrNil];
 }
 
 - (instancetype)usingSearchAction:(id<GREYAction>)action
              onElementWithMatcher:(id<GREYMatcher>)matcher {
-  NSParameterAssert(action);
-  NSParameterAssert(matcher);
+  GREYThrowOnNilParameter(action);
+  GREYThrowOnNilParameter(matcher);
 
   _searchActionElementMatcher = matcher;
   _searchAction = action;
@@ -539,47 +545,182 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
 - (BOOL)grey_handleFailureOfAction:(id<GREYAction>)action
                        actionError:(NSError *)actionError
               userProvidedOutError:(__strong NSError **)userProvidedError {
-  NSParameterAssert(actionError);
+  GREYFatalAssert(actionError);
 
-  // Throw an exception if userProvidedError isn't provided and the action failed.
+  // Throw an exception if the user did not provide an out error.
   if (!userProvidedError) {
+    // First check errors that can happen at the inner most level such as timeouts.
+    NSDictionary * errorDescriptions =
+        [[GREYError grey_nestedErrorDictionariesForError:actionError] objectAtIndex:0];
+
+    if (errorDescriptions != nil) {
+      NSString *errorDomain = errorDescriptions[kErrorDomainKey];
+      NSInteger errorCode = [errorDescriptions[kErrorCodeKey] integerValue];
+      if (([errorDomain isEqualToString:kGREYInteractionErrorDomain]) &&
+          (errorCode == kGREYInteractionTimeoutErrorCode)) {
+        NSMutableDictionary *errorDetails = [[NSMutableDictionary alloc] init];
+
+        errorDetails[kErrorDetailActionNameKey] = action.name;
+        errorDetails[kErrorDetailRecoverySuggestionKey] = @"Increase timeout for matching element";
+        errorDetails[kErrorDetailElementMatcherKey] = _elementMatcher.description;
+        NSArray *keyOrder = @[ kErrorDetailActionNameKey,
+                               kErrorDetailElementMatcherKey,
+                               kErrorDetailRecoverySuggestionKey ];
+
+        NSString *reasonDetail = [GREYObjectFormatter formatDictionary:errorDetails
+                                                                indent:kGREYObjectFormatIndent
+                                                             hideEmpty:YES
+                                                              keyOrder:keyOrder];
+        NSString *reason = [NSString stringWithFormat:@"Matching element timed out.\n"
+                                                      @"Exception with Action: %@\n",
+                                                      reasonDetail];
+        I_GREYTimeout(reason,
+                      @"Error Trace: %@",
+                      [GREYError grey_nestedDescriptionForError:actionError]);
+        return NO;
+      } else if (([errorDomain isEqualToString:kGREYUIThreadExecutorErrorDomain]) &&
+                 (errorCode == kGREYUIThreadExecutorTimeoutErrorCode)) {
+        NSMutableDictionary *errorDetails = [[NSMutableDictionary alloc] init];
+
+        errorDetails[kErrorDetailActionNameKey] = action.name;
+        errorDetails[kErrorDetailElementMatcherKey] = _elementMatcher.description;
+
+        NSArray *keyOrder = @[ kErrorDetailActionNameKey, kErrorDetailElementMatcherKey ];
+        NSString *reasonDetail = [GREYObjectFormatter formatDictionary:errorDetails
+                                                                indent:kGREYObjectFormatIndent
+                                                             hideEmpty:YES
+                                                              keyOrder:keyOrder];
+        NSString *reason =
+            [NSString stringWithFormat:@"Timed out while waiting to perform action.\n"
+                                       @"Exception with Action: %@\n", reasonDetail];
+
+        if ([actionError isKindOfClass:[GREYError class]]) {
+          [(GREYError *)actionError setErrorInfo:errorDetails];
+        }
+
+        I_GREYTimeout(reason, @"Error Trace: %@",
+                      [GREYError grey_nestedDescriptionForError:actionError]);
+        return NO;
+      }
+    }
+
+    // Second, check for errors with less specific reason (such as interaction error).
     if ([actionError.domain isEqualToString:kGREYInteractionErrorDomain]) {
       NSString *searchAPIInfo = [self grey_searchActionDescription];
 
-      // Customize exception based on the error.
       switch (actionError.code) {
         case kGREYInteractionElementNotFoundErrorCode: {
-          NSString *reason =
-              [NSString stringWithFormat:@"Action '%@' was not performed because no UI element "
-                                         @"matching %@ was found.", action.name, _elementMatcher];
-          I_GREYElementNotFound(reason, @"%@Complete Error: %@", searchAPIInfo, actionError);
+          NSMutableDictionary *errorDetails = [[NSMutableDictionary alloc] init];
+
+          errorDetails[kErrorDetailActionNameKey] = action.name;
+          errorDetails[kErrorDetailElementMatcherKey] = _elementMatcher.description;
+          errorDetails[kErrorDetailRecoverySuggestionKey] =
+              @"Check if the element exists in the UI hierarchy printed below. If it exists, "
+              @"adjust the matcher so that it accurately matches element.";
+
+          NSArray *keyOrder = @[ kErrorDetailActionNameKey,
+                                 kErrorDetailElementMatcherKey,
+                                 kErrorDetailRecoverySuggestionKey ];
+          NSString *reasonDetail = [GREYObjectFormatter formatDictionary:errorDetails
+                                                                  indent:kGREYObjectFormatIndent
+                                                               hideEmpty:YES
+                                                                keyOrder:keyOrder];
+          NSString *reason = [NSString stringWithFormat:@"Cannot find UI element.\n"
+                                                        @"Exception with Action: %@\n",
+                                                        reasonDetail];
+
+          if ([actionError isKindOfClass:[GREYError class]]) {
+            [(GREYError *)actionError setErrorInfo:errorDetails];
+          }
+
+          I_GREYElementNotFound(reason,
+                                @"%@Error Trace: %@",
+                                searchAPIInfo,
+                                [GREYError grey_nestedDescriptionForError:actionError]);
           return NO;
         }
         case kGREYInteractionMultipleElementsMatchedErrorCode: {
-          NSString *reason =
-             [NSString stringWithFormat:@"Action '%@' was not performed because multiple UI "
-                                        @"elements matching %@ were found. Use grey_allOf(...) to "
-                                        @"create a more specific matcher.",
-                                        action.name, _elementMatcher];
-          // We print the localized description here to prevent the multiple matchers info from
-          // being displayed twice - once in the error and once in the userInfo dict.
+          NSMutableDictionary *errorDetails = [[NSMutableDictionary alloc] init];
+
+          errorDetails[kErrorDetailActionNameKey] = action.name;
+          errorDetails[kErrorDetailElementMatcherKey] = _elementMatcher.description;
+          errorDetails[kErrorDetailRecoverySuggestionKey] =
+              @"Create a more specific matcher to uniquely match an element. If that's not "
+              @"possible then use atIndex: to select from one of the matched elements but the "
+              @"order of elements may change.";
+
+          NSArray *keyOrder = @[ kErrorDetailActionNameKey,
+                                 kErrorDetailElementMatcherKey,
+                                 kErrorDetailRecoverySuggestionKey ];
+          NSString *reasonDetail = [GREYObjectFormatter formatDictionary:errorDetails
+                                                                  indent:kGREYObjectFormatIndent
+                                                               hideEmpty:YES
+                                                                keyOrder:keyOrder];
+          NSString *reason = [NSString stringWithFormat:@"Multiple UI elements matched "
+                                                        @"for the given criteria.\n"
+                                                        @"Exception with Action: %@\n",
+                                                        reasonDetail];
+
+          if ([actionError isKindOfClass:[GREYError class]]) {
+            [(GREYError *)actionError setErrorInfo:errorDetails];
+          }
+
           I_GREYMultipleElementsFound(reason,
-                                      @"%@Complete Error: %@",
+                                      @"%@Error Trace: %@",
                                       searchAPIInfo,
-                                      actionError.localizedDescription);
+                                      [GREYError grey_nestedDescriptionForError:actionError]);
+          return NO;
+        }
+        case kGREYInteractionConstraintsFailedErrorCode: {
+          NSArray *keyOrder = @[ kErrorDetailActionNameKey,
+                                 kErrorDetailElementDescriptionKey,
+                                 kErrorDetailConstraintRequirementKey,
+                                 kErrorDetailConstraintDetailsKey,
+                                 kErrorDetailRecoverySuggestionKey ];
+          NSDictionary *errorInfo = [(GREYError *)actionError errorInfo];
+          NSString *reasonDetail = [GREYObjectFormatter formatDictionary:errorInfo
+                                                                  indent:kGREYObjectFormatIndent
+                                                               hideEmpty:YES
+                                                                keyOrder:keyOrder];
+
+          NSString *reason = [NSString stringWithFormat:@"Cannot perform action due to "
+                                                        @"constraint(s) failure.\n"
+                                                        @"Exception with Action: %@\n",
+                                                        reasonDetail];
+          NSString *nestedError = [GREYError grey_nestedDescriptionForError:actionError];
+          I_GREYConstraintsFailedWithDetails(reason, nestedError);
           return NO;
         }
       }
     }
+    // Add unique failure messages for failure with unknown reason.
+    NSMutableDictionary *errorDetails = [[NSMutableDictionary alloc] init];
 
-    // TODO: Add unique failure messages for timeout and other well-known reasons.
-    NSString *reason = [NSString stringWithFormat:@"Action '%@' failed.", action.name];
+    errorDetails[kErrorDetailActionNameKey] = action.name;
+    errorDetails[kErrorDetailElementMatcherKey] = _elementMatcher.description;
+
+    NSArray *keyOrder = @[ kErrorDetailActionNameKey,
+                           kErrorDetailElementMatcherKey ];
+    NSString *reasonDetail = [GREYObjectFormatter formatDictionary:errorDetails
+                                                            indent:kGREYObjectFormatIndent
+                                                         hideEmpty:YES
+                                                          keyOrder:keyOrder];
+    NSString *reason = [NSString stringWithFormat:@"An action failed. "
+                                                  @"Please refer to the error trace below.\n"
+                                                  @"Exception with Action: %@\n",
+                                                  reasonDetail];
     I_GREYActionFail(reason,
-                     @"Element matcher: %@\nComplete Error: %@", _elementMatcher, actionError);
+                     @"Error Trace: %@",
+                     [GREYError grey_nestedDescriptionForError:actionError]);
   } else {
+    if ([actionError isKindOfClass:[GREYError class]]) {
+      NSMutableDictionary *errorDetails =
+          [[NSMutableDictionary alloc] initWithDictionary:((GREYError *)actionError).errorInfo];
+      errorDetails[kErrorDetailElementMatcherKey] = _elementMatcher.description;
+      ((GREYError *)actionError).errorInfo = errorDetails;
+    }
     *userProvidedError = actionError;
   }
-
   return NO;
 }
 
@@ -599,44 +740,169 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
 - (BOOL)grey_handleFailureOfAssertion:(id<GREYAssertion>)assertion
                        assertionError:(NSError *)assertionError
                  userProvidedOutError:(__strong NSError **)userProvidedError {
-  NSParameterAssert(assertionError);
-  // Throw an exception if userProvidedError isn't provided and the assertion failed.
+  GREYFatalAssert(assertionError);
+
+  // Throw an exception if the user did not provide an out error.
   if (!userProvidedError) {
+    // first check errors that can happens at the inner most level
+    // for example: executor error
+    NSDictionary * errorDescriptions =
+        [[GREYError grey_nestedErrorDictionariesForError:assertionError] objectAtIndex:0];
+
+    if (errorDescriptions != nil) {
+      NSString *errorDomain = errorDescriptions[kErrorDomainKey];
+      NSInteger errorCode = [errorDescriptions[kErrorCodeKey] integerValue];
+      if (([errorDomain isEqualToString:kGREYInteractionErrorDomain]) &&
+          (errorCode == kGREYInteractionTimeoutErrorCode)) {
+        NSMutableDictionary *errorDetails = [[NSMutableDictionary alloc] init];
+
+        errorDetails[kErrorDetailAssertCriteriaKey] = assertion.name;
+        errorDetails[kErrorDetailRecoverySuggestionKey] = @"Increase timeout for matching element";
+        errorDetails[kErrorDetailElementMatcherKey] = _elementMatcher.description;
+        NSArray *keyOrder = @[ kErrorDetailAssertCriteriaKey,
+                               kErrorDetailElementMatcherKey,
+                               kErrorDetailRecoverySuggestionKey ];
+
+        NSString *reasonDetail = [GREYObjectFormatter formatDictionary:errorDetails
+                                                                indent:kGREYObjectFormatIndent
+                                                             hideEmpty:YES
+                                                              keyOrder:keyOrder];
+        NSString *reason = [NSString stringWithFormat:@"Matching element timed out.\n"
+                                                      @"Exception with Assertion: %@\n",
+                                                      reasonDetail];
+
+        if ([assertionError isKindOfClass:[GREYError class]]) {
+          [(GREYError *)assertionError setErrorInfo:errorDetails];
+        }
+
+        I_GREYTimeout(reason,
+                      @"Error Trace: %@",
+                      [GREYError grey_nestedDescriptionForError:assertionError]);
+        return NO;
+      } else if (([errorDomain isEqualToString:kGREYUIThreadExecutorErrorDomain]) &&
+                 (errorCode == kGREYUIThreadExecutorTimeoutErrorCode)) {
+        NSMutableDictionary *errorDetails = [[NSMutableDictionary alloc] init];
+
+        errorDetails[kErrorDetailAssertCriteriaKey] = assertion.name;
+        errorDetails[kErrorDetailElementMatcherKey] = _elementMatcher.description;
+
+        NSArray *keyOrder = @[ kErrorDetailAssertCriteriaKey,
+                               kErrorDetailElementMatcherKey ];
+        NSString *reasonDetail = [GREYObjectFormatter formatDictionary:errorDetails
+                                                                indent:kGREYObjectFormatIndent
+                                                             hideEmpty:YES
+                                                              keyOrder:keyOrder];
+        NSString *reason =
+            [NSString stringWithFormat:@"Timed out while waiting to perform assertion.\n"
+                                       @"Exception with Assertion: %@\n", reasonDetail];
+
+        if ([assertionError isKindOfClass:[GREYError class]]) {
+          [(GREYError *)assertionError setErrorInfo:errorDetails];
+        }
+
+        I_GREYTimeout(reason,
+                      @"Error Trace: %@",
+                      [GREYError grey_nestedDescriptionForError:assertionError]);
+        return NO;
+      }
+    }
+
+    // second, check for errors with less specific reason (such as interaction error)
     if ([assertionError.domain isEqualToString:kGREYInteractionErrorDomain]) {
       NSString *searchAPIInfo = [self grey_searchActionDescription];
 
-      // Customize exception based on the error.
       switch (assertionError.code) {
         case kGREYInteractionElementNotFoundErrorCode: {
-          NSString *reason =
-              [NSString stringWithFormat:@"Assertion '%@' was not performed because no UI element "
-                                         @"matching %@ was found.",
-                                         [assertion name], _elementMatcher];
-          I_GREYElementNotFound(reason, @"%@Complete Error: %@", searchAPIInfo, assertionError);
+          NSMutableDictionary *errorDetails = [[NSMutableDictionary alloc] init];
+
+          errorDetails[kErrorDetailAssertCriteriaKey] = assertion.name;
+          errorDetails[kErrorDetailElementMatcherKey] = _elementMatcher.description;
+          errorDetails[kErrorDetailRecoverySuggestionKey] =
+              @"Check if the element exists in the UI hierarchy printed below. If it exists, "
+              @"adjust the matcher so that it accurately matches element.";
+
+          NSArray *keyOrder = @[ kErrorDetailAssertCriteriaKey,
+                                 kErrorDetailElementMatcherKey,
+                                 kErrorDetailRecoverySuggestionKey ];
+          NSString *reasonDetail = [GREYObjectFormatter formatDictionary:errorDetails
+                                                                  indent:kGREYObjectFormatIndent
+                                                               hideEmpty:YES
+                                                                keyOrder:keyOrder];
+          NSString *reason = [NSString stringWithFormat:@"Cannot find UI Element.\n"
+                                                        @"Exception with Assertion: %@\n",
+                                                        reasonDetail];
+
+          if ([assertionError isKindOfClass:[GREYError class]]) {
+            [(GREYError *)assertionError setErrorInfo:errorDetails];
+          }
+
+          I_GREYElementNotFound(reason,
+                                @"%@Error Trace: %@",
+                                searchAPIInfo,
+                                [GREYError grey_nestedDescriptionForError:assertionError]);
           return NO;
         }
         case kGREYInteractionMultipleElementsMatchedErrorCode: {
-          NSString *reason =
-              [NSString stringWithFormat:@"Assertion '%@' was not performed because multiple UI "
-                                         @"elements matching %@ were found. Use grey_allOf(...) to "
-                                         @"create a more specific matcher.",
-                                         [assertion name], _elementMatcher];
-          I_GREYMultipleElementsFound(reason, @"%@Complete Error: %@",
+          NSMutableDictionary *errorDetails = [[NSMutableDictionary alloc] init];
+
+          errorDetails[kErrorDetailAssertCriteriaKey] = assertion.name;
+          errorDetails[kErrorDetailElementMatcherKey] = _elementMatcher.description;
+          errorDetails[kErrorDetailRecoverySuggestionKey] =
+              @"Create a more specific matcher to narrow matched element";
+
+          NSArray *keyOrder = @[ kErrorDetailAssertCriteriaKey,
+                                 kErrorDetailElementMatcherKey,
+                                 kErrorDetailRecoverySuggestionKey ];
+          NSString *reasonDetail = [GREYObjectFormatter formatDictionary:errorDetails
+                                                                  indent:kGREYObjectFormatIndent
+                                                               hideEmpty:YES
+                                                                keyOrder:keyOrder];
+          NSString *reason = [NSString stringWithFormat:@"Multiple UI elements matched "
+                                                        @"for given criteria.\n"
+                                                        @"Exception with Assertion: %@\n",
+                                                        reasonDetail];
+
+          if ([assertionError isKindOfClass:[GREYError class]]) {
+            [(GREYError *)assertionError setErrorInfo:errorDetails];
+          }
+
+          I_GREYMultipleElementsFound(reason,
+                                      @"%@Error Trace: %@",
                                       searchAPIInfo,
-                                      assertionError);
+                                      [GREYError grey_nestedDescriptionForError:assertionError]);
           return NO;
         }
       }
     }
 
-    // TODO: Add unique failure messages for timeout and other well-known reason for failure.
-    NSString *reason = [NSString stringWithFormat:@"Assertion '%@' failed.", assertion.name];
-    I_GREYAssertionFail(reason, @"Element matcher: %@\nComplete Error: %@",
-                        _elementMatcher, assertionError);
+    // Add unique failure messages for failure with unknown reason
+    NSMutableDictionary *errorDetails = [[NSMutableDictionary alloc] init];
+
+    errorDetails[kErrorDetailAssertCriteriaKey] = assertion.name;
+    errorDetails[kErrorDetailElementMatcherKey] = _elementMatcher.description;
+
+    NSArray *keyOrder = @[ kErrorDetailAssertCriteriaKey,
+                           kErrorDetailElementMatcherKey ];
+    NSString *reasonDetail = [GREYObjectFormatter formatDictionary:errorDetails
+                                                            indent:kGREYObjectFormatIndent
+                                                         hideEmpty:YES
+                                                          keyOrder:keyOrder];
+    NSString *reason = [NSString stringWithFormat:@"An assertion failed.\n"
+                                                  @"Exception with Assertion: %@\n",
+                                                  reasonDetail];
+
+    I_GREYAssertionFail(reason,
+                        @"Error Trace: %@",
+                        [GREYError grey_nestedDescriptionForError:assertionError]);
   } else {
+    if ([assertionError isKindOfClass:[GREYError class]]) {
+      NSMutableDictionary *errorDetails =
+          [[NSMutableDictionary alloc] initWithDictionary:((GREYError *)assertionError).errorInfo];
+      errorDetails[kErrorDetailElementMatcherKey] = _elementMatcher.description;
+      ((GREYError *)assertionError).errorInfo = errorDetails;
+    }
     *userProvidedError = assertionError;
   }
-
   return NO;
 }
 
@@ -687,10 +953,7 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
   }
 
   // Populate the user info for the multiple matching elements error.
-  NSDictionary *userInfo = @{ NSLocalizedDescriptionKey : errorDescription };
-  return [NSError errorWithDomain:kGREYInteractionErrorDomain
-                             code:errorCode
-                         userInfo:userInfo];
+  return GREYErrorMake(kGREYInteractionErrorDomain, errorCode, errorDescription);
 }
 
 /**
@@ -699,7 +962,7 @@ NSString *const kGREYAssertionErrorUserInfoKey = @"kGREYAssertionErrorUserInfoKe
 - (NSString *)grey_searchActionDescription {
   if (_searchAction) {
     return [NSString stringWithFormat:@"Search action: %@. \nSearch action element matcher: %@.\n",
-            _searchAction, _searchActionElementMatcher];
+                                      _searchAction, _searchActionElementMatcher];
   } else {
     return @"";
   }

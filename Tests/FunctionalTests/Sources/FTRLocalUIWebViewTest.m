@@ -14,19 +14,9 @@
 // limitations under the License.
 //
 
-#import <EarlGrey/GREYAppStateTracker.h>
-#import <EarlGrey/GREYPrivate.h>
-
 #import "FTRBaseIntegrationTest.h"
-
-// Required for testing UIWebView states.
-@interface GREYAppStateTracker (GREYExposedForTesting)
-- (GREYAppState)grey_lastKnownStateForElement:(id)element;
-@end
-
-@interface UIWebView (GREYExposedForTesting)
-- (void)grey_trackAJAXLoading;
-@end
+#import <EarlGrey/EarlGrey.h>
+#import "Synchronization/GREYAppStateTracker.h"
 
 // These web view tests are not run by default since they require network access
 // and have a possibility of flakiness.
@@ -40,51 +30,79 @@
   [self openTestViewNamed:@"Web Views"];
 }
 
+// Test disabled on Xcode 9 beta. http://www.openradar.me/33383174
 - (void)testSuccessiveTaps {
+  if (iOS11_OR_ABOVE()) {
+    return;
+  }
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"loadGoogle")]
       performAction:grey_tap()];
-  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"IMAGES")]
-      performAction:[GREYActions actionForTap]];
-
-  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"APPS")]
-      performAction:[GREYActions actionForTap]];
-
+  [self ftr_waitForWebElementWithName:@"NEWS" elementMatcher:grey_accessibilityLabel(@"NEWS")];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"NEWS")]
-      performAction:[GREYActions actionForTap]];
+      performAction:grey_tap()];
+
+  NSError *error;
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"IMAGES")]
+      performAction:grey_tap() error:&error];
+  if (error) {
+    // On some form factors, label is set to "Images" instead of "IMAGES".
+    [[[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Images")] atIndex:1]
+        performAction:grey_tap()];
+  }
+
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"VIDEOS")]
+      performAction:grey_tap()];
 
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"ALL")]
-      performAction:[GREYActions actionForTap]];
+      performAction:grey_tap()];
 }
 
+// Test disabled on Xcode 9 beta. http://www.openradar.me/33383174
 - (void)testAJAXLoad {
+  if (iOS11_OR_ABOVE()) {
+    return;
+  }
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"loadGoogle")]
       performAction:grey_tap()];
+  [self ftr_waitForWebElementWithName:@"ALL" elementMatcher:grey_accessibilityLabel(@"ALL")];
+
+  // Clicking on "Next page" triggers AJAX loading.
   id<GREYMatcher> nextPageMatcher =
       grey_allOf(grey_accessibilityLabel(@"Next page"), grey_interactable(), nil);
+  NSError *error;
   [[[EarlGrey selectElementWithMatcher:nextPageMatcher]
       usingSearchAction:grey_scrollInDirection(kGREYDirectionDown, 200)
       onElementWithMatcher:grey_kindOfClass([UIWebView class])]
-      performAction:grey_tap()];
-  [self ftr_waitForWebElementWithName:@"APPS" elementMatcher:grey_accessibilityLabel(@"APPS")];
-  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"APPS")]
+      performAction:grey_tap() error:&error];
+  if (error) {
+    // On some form factors, label is set to "Next" instead of "Next page".
+    [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Next")]
+        performAction:grey_tap()];
+  }
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"IMAGES")]
       assertWithMatcher:grey_sufficientlyVisible()];
 }
 
+// Test disabled on Xcode 9 beta. http://www.openradar.me/33383174
 - (void)testTextFieldInteraction {
+  if (iOS11_OR_ABOVE()) {
+    return;
+  }
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"loadGoogle")]
       performAction:grey_tap()];
   id<GREYMatcher> searchButtonMatcher = grey_accessibilityHint(@"Search");
-  [self ftr_waitForWebElementWithName:@"Search Button" elementMatcher:searchButtonMatcher];
+  [self ftr_waitForWebElementWithName:@"Search" elementMatcher:searchButtonMatcher];
   [[[EarlGrey selectElementWithMatcher:searchButtonMatcher]
       performAction:grey_clearText()]
       performAction:grey_typeText(@"20 + 22\n")];
 
-  [self ftr_waitForWebElementWithName:@"Search Button" elementMatcher:grey_accessibilityLabel(@"42")];
+  [self ftr_waitForWebElementWithName:@"42"
+                       elementMatcher:grey_accessibilityLabel(@"42")];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"42")]
       assertWithMatcher:grey_sufficientlyVisible()];
 
-  // We need to tap because the second time we do typeAfterClearing, it passes firstResponder check
-  // and never ends up auto-tapping on search field.
+  // We need to tap because the second time we do typeAfterClearing, it passes firstResponder
+  // check and never ends up auto-tapping on search field.
   [[EarlGrey selectElementWithMatcher:searchButtonMatcher]
       performAction:grey_tap()];
 
@@ -97,10 +115,15 @@
                                              grey_accessibilityTrait(UIAccessibilityTraitHeader),
                                              nil);
   [self ftr_waitForWebElementWithName:@"Search Result" elementMatcher:resultMatcher];
-  [[EarlGrey selectElementWithMatcher:resultMatcher] assertWithMatcher:grey_sufficientlyVisible()];
+  [[EarlGrey selectElementWithMatcher:resultMatcher]
+      assertWithMatcher:grey_sufficientlyVisible()];
 }
 
+// Test disabled on Xcode 9 beta. http://www.openradar.me/33383174
 - (void)testJavaScriptExecution {
+  if (iOS11_OR_ABOVE()) {
+    return;
+  }
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"loadGoogle")]
       performAction:grey_tap()];
   id<GREYAction> jsAction =
@@ -108,11 +131,18 @@
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"FTRTestWebView")]
       performAction:jsAction];
 
+  NSError *error;
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"IMAGES")]
-      assertWithMatcher:grey_sufficientlyVisible()];
+      assertWithMatcher:grey_sufficientlyVisible() error:&error];
+  if (error) {
+    // On some form factors, label is set to "Images" instead of "IMAGES".
+    [[[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Images")] atIndex:1]
+        assertWithMatcher:grey_sufficientlyVisible()];
+  }
 
-  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"FTRTestWebView")] performAction:
-      grey_javaScriptExecution(@"window.location.href='http://translate.google.com'", nil)];
+  NSString *executionString = @"window.location.href='http://translate.google.com'";
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"FTRTestWebView")]
+      performAction:grey_javaScriptExecution(executionString, nil)];
 
   id<GREYAction> executeJavascript =
       grey_javaScriptExecution(@"window.location.href='http://play.google.com'", nil);
@@ -121,7 +151,7 @@
 
   NSString *jsResult;
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"FTRTestWebView")]
-      performAction:[GREYActions actionForJavaScriptExecution:@"2 + 2" output:&jsResult]];
+      performAction:grey_javaScriptExecution(@"2 + 2", &jsResult)];
   GREYAssertTrue([jsResult isEqualToString:@"4"], @"Expected: 4, Actual: %@", jsResult);
 }
 
@@ -137,7 +167,7 @@
 - (void)ftr_waitForWebElementWithName:(NSString *)name elementMatcher:(id<GREYMatcher>)matcher {
   // TODO: Improve EarlGrey webview synchronization so that it automatically waits for the page to
   // load removing the need for conditions such as this.
-  [[GREYCondition conditionWithName:[name stringByAppendingString:@" Condition"]
+  [[GREYCondition conditionWithName:[@"Wait For Element With Name: " stringByAppendingString:name]
                               block:^BOOL {
     NSError *error = nil;
     [[EarlGrey selectElementWithMatcher:matcher]

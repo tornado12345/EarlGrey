@@ -17,7 +17,8 @@
 #import "Synchronization/GREYTimedIdlingResource.h"
 
 #import "Common/GREYDefines.h"
-#import "Common/GREYPrivate.h"
+#import "Common/GREYThrowDefines.h"
+#import "Synchronization/GREYUIThreadExecutor+Internal.h"
 #import "Synchronization/GREYUIThreadExecutor.h"
 
 @implementation GREYTimedIdlingResource {
@@ -45,9 +46,9 @@
 - (instancetype)initWithObject:(NSObject *)object
               trackingDuration:(CFTimeInterval)seconds
                           name:(NSString *)name {
-  NSParameterAssert(object);
-  NSParameterAssert(name);
-  NSAssert(seconds >= 0, @"seconds must be positive");
+  GREYThrowOnNilParameter(object);
+  GREYThrowOnNilParameter(name);
+  GREYThrowOnFailedConditionWithMessage(seconds >= 0, @"seconds must be positive");
 
   self = [super init];
   if (self) {

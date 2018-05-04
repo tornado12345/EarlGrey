@@ -93,8 +93,8 @@ that can pinpoint any element in the UI hierarchy.
 All EarlGrey matchers are available in the [GREYMatchers](../EarlGrey/Matcher/GREYMatchers.m)
 factory class. The best way to find a UI element is to use its accessibility properties. We
 strongly recommend using an [accessibility identifier](https://developer.apple.com/library/ios/documentation/uikit/reference/UIAccessibilityIdentification_Protocol/Introduction/Introduction.html)
-as it uniquely identifies an element. Use `grey_accessibilityID()` as your matcher to get a UI
-element's accessibility identifier. You can also use other accessibility properties, such as using
+as it uniquely identifies an element. Use `grey_accessibilityID()` as your matcher to select a UI
+element by its accessibility identifier. You can also use other accessibility properties, such as using
 `grey_accessibilityTrait()` as the matcher for UI elements with specific accessibility traits, or by using
 `grey_accessibilityLabel()` as the matcher for accessibility labels.
 
@@ -247,10 +247,14 @@ object containing failure details.
 
 ```objc
 NSError *error;
-[[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"TapMe")]
+[[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"Non-Existent-Ax-Id")]
     performAction:grey_tap()
             error:&error];
 ```
+
+In the above case, an exception **will not** be thrown for the EarlGrey interaction being performed
+on a non-existent element. Instead, the error object passed will save the failure details and not
+fail the test immediately. The error details can then be perused for finding the failure details.
 
 #### Custom Actions
 
@@ -264,7 +268,7 @@ of a block. The following code creates an action using a block that invokes a cu
 ```objc
 - (id<GREYAction>)animateWindowAction {
   return [GREYActionBlock actionWithName:@"Animate Window"
-                              constraint:nil
+                             constraints:nil
                             performBlock:^(id element, NSError *__strong *errorOrNil) {
     // First, make sure the element is attached to a window.
     if ([element window] == nil) {
@@ -419,6 +423,12 @@ nil
 non-nil value
   * `GREYAssertEqual(left, right, reason, ...)` — Fails if left != right for scalar
 types
+  * `GREYAssertNotEqual(left, right, reason, ...)` — Fails if left == right for scalar
+types
+  * `GREYAssertEqualObjects(left, right, reason, ...)` — Fails if [left isEqual:right] returns
+false
+  * `GREYAssertNotEqualObjects(left, right, reason, ...)` — Fails if [left isEqual:right] returns
+true
   * `GREYFail(reason, ...)` — Fails immediately with the provided reason
   * `GREYFailWithDetails(reason, details, ...)` — Fails immediately with the provided reason and
   details
@@ -606,3 +616,7 @@ You can choose from the following orientation modes (for more information, see [
   * `UIDeviceOrientationLandscapeRight`
   * `UIDeviceOrientationFaceUp`
   * `UIDeviceOrientationFaceDown`
+
+### Shake Gesture
+
+You can use `[EarlGrey shakeDeviceWithError:]` to simulate a shake gesture in a simulator.

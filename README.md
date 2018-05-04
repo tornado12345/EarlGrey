@@ -1,9 +1,10 @@
 # EarlGrey
 [![Apache License](https://img.shields.io/badge/license-Apache%202-lightgrey.svg?style=flat)](https://github.com/google/EarlGrey/blob/master/LICENSE)
 [![CC-BY 4.0 License](https://img.shields.io/badge/license-CC%20BY%204.0-lightgrey.svg)](https://github.com/google/EarlGrey/blob/master/LICENSE)
-[![CocoaPods](https://img.shields.io/cocoapods/v/EarlGrey.svg?maxAge=2592000)](https://cocoapods.org/pods/EarlGrey)
 [![Build Status](https://travis-ci.org/google/EarlGrey.svg?branch=master)](https://travis-ci.org/google/EarlGrey)
 [![Carthage compatible](https://img.shields.io/badge/Carthage-compatible-4BC51D.svg?style=flat)](https://github.com/Carthage/Carthage)
+[![CocoaPods](https://img.shields.io/cocoapods/v/EarlGrey.svg?maxAge=2592000)](https://cocoapods.org/pods/EarlGrey)
+[![Gem Version](https://badge.fury.io/rb/earlgrey.svg)](https://rubygems.org/gems/earlgrey)
 
 EarlGrey is a native iOS UI automation test framework that enables you to write
 clear, concise tests.
@@ -44,7 +45,8 @@ You can bring more specific issues to our attention by asking them on
 You can also start new discussions with us on our [Google group](https://groups.google.com/forum/#!forum/earlgrey-discuss)
 or request to join our [slack channel](https://googleoss.slack.com/messages/earlgrey).
 
-  * [FAQ](https://github.com/google/EarlGrey/tree/master/docs/faq.md)
+  * [FAQ - Frequently Asked Questions](https://github.com/google/EarlGrey/tree/master/docs/faq.md)
+  * [IFAQ - Infrequently Asked Questions](https://github.com/google/EarlGrey/tree/master/docs/ifaq.md)
   * [Known Issues](https://github.com/google/EarlGrey/tree/master/docs/known-issues.md)
   * [Stack Overflow](http://stackoverflow.com/questions/tagged/earlgrey)
   * [Slack](https://googleoss.slack.com/messages/earlgrey)
@@ -54,21 +56,23 @@ or request to join our [slack channel](https://googleoss.slack.com/messages/earl
 
 To prioritize and improve EarlGrey, the framework collects usage data and
 uploads it to Google Analytics. More specifically, the framework collects the
-App’s *Bundle ID* (as a MD5 hash) and the total number of test cases. This
+**MD5 hash** of *Bundle ID*,  *Test Class Names* and *Test Method Names*. This
 information allows us to measure the volume of usage. For more detailed
 information about our analytics collection, please peruse the
 [GREYAnalytics.m](https://github.com/google/EarlGrey/tree/master/EarlGrey/Common/GREYAnalytics.m)
-file which contains the implementation details. If they wish,
-users can choose to opt out by disabling the Analytics config setting in their
-test’s `- (void)setUp` method:
+file which contains the implementation details. If they wish, users can choose
+to opt out by disabling the Analytics config setting in their test’s
+`- (void)setUp` method:
 
 In Objective-C:
+
 ```objc
 // Disable analytics.
 [[GREYConfiguration sharedInstance] setValue:@(NO) forConfigKey:kGREYConfigKeyAnalyticsEnabled];
 ```
 
 In Swift:
+
 ```swift
 // Disable analytics.
 GREYConfiguration.sharedInstance().setValue(false, forConfigKey: kGREYConfigKeyAnalyticsEnabled)
@@ -83,9 +87,7 @@ Please make sure you’ve followed the guidelines in
 
   1. Clone the EarlGrey repository from GitHub:
 
-    ```
     git clone https://github.com/google/EarlGrey.git
-    ```
 
   2. After you have cloned the EarlGrey repository, download all the dependencies
 using [**setup-earlgrey.sh**](https://github.com/google/EarlGrey/tree/master/Scripts/setup-earlgrey.sh).

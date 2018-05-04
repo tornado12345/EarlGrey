@@ -74,6 +74,7 @@ public func GREYFailWithDetails(_ reason: String, details: String) {
 private func GREYAssert(_ expression: @autoclosure () -> Bool,
                         _ reason: String, details: String) {
   GREYSetCurrentAsFailable()
+  GREYWaitUntilIdle()
   if !expression() {
     EarlGrey.handle(exception: GREYFrameworkException(name: kGREYAssertionFailedException,
                                                       reason: reason),
@@ -84,56 +85,102 @@ private func GREYAssert(_ expression: @autoclosure () -> Bool,
 private func GREYSetCurrentAsFailable() {
   let greyFailureHandlerSelector =
     #selector(GREYFailureHandler.setInvocationFile(_:andInvocationLine:))
+  let greyFailureHandler =
+    Thread.current.threadDictionary.value(forKey: kGREYFailureHandlerKey) as! GREYFailureHandler
   if greyFailureHandler.responds(to: greyFailureHandlerSelector) {
     greyFailureHandler.setInvocationFile!(#file, andInvocationLine:#line)
   }
 }
 
-class EarlGrey: NSObject {
-  public class func select(elementWithMatcher matcher:GREYMatcher,
-                           file: String = #file,
-                           line: UInt = #line) -> GREYElementInteraction {
-    return EarlGreyImpl.invoked(fromFile: file, lineNumber: line).selectElement(with: matcher)
+private func GREYWaitUntilIdle() {
+  GREYUIThreadExecutor.sharedInstance().drainUntilIdle()
+}
+
+open class EarlGrey: NSObject {
+  public static func selectElement(with matcher: GREYMatcher,
+                                   file: StaticString = #file,
+                                   line: UInt = #line) -> GREYInteraction {
+    return EarlGreyImpl.invoked(fromFile: file.description, lineNumber: line)
+             .selectElement(with: matcher)
   }
 
-  public class func setFailureHandler(handler: GREYFailureHandler,
-                                      file: String = #file,
+  @available(*, deprecated, renamed: "selectElement(with:)")
+  open class func select(elementWithMatcher matcher:GREYMatcher,
+                         file: StaticString = #file,
+                         line: UInt = #line) -> GREYElementInteraction {
+    return EarlGreyImpl.invoked(fromFile: file.description, lineNumber: line)
+             .selectElement(with: matcher)
+  }
+
+  open class func setFailureHandler(handler: GREYFailureHandler,
+                                      file: StaticString = #file,
                                       line: UInt = #line) {
-    return EarlGreyImpl.invoked(fromFile: file, lineNumber: line).setFailureHandler(handler)
+    return EarlGreyImpl.invoked(fromFile: file.description, lineNumber: line)
+             .setFailureHandler(handler)
   }
 
-  public class func handle(exception: GREYFrameworkException,
+  open class func handle(exception: GREYFrameworkException,
                            details: String,
-                           file: String = #file,
+                           file: StaticString = #file,
                            line: UInt = #line) {
-    return EarlGreyImpl.invoked(fromFile: file, lineNumber: line).handle(exception,
-                                                                           details: details)
+    return EarlGreyImpl.invoked(fromFile: file.description, lineNumber: line)
+             .handle(exception, details: details)
   }
 
-  @discardableResult public class func rotateDeviceTo(orientation: UIDeviceOrientation,
-                                                      errorOrNil: UnsafeMutablePointer<NSError?>!,
-                                                      file: String = #file,
-                                                      line: UInt = #line)
+  @discardableResult open class func rotateDeviceTo(orientation: UIDeviceOrientation,
+                                                    errorOrNil: UnsafeMutablePointer<NSError?>!,
+                                                    file: StaticString = #file,
+                                                    line: UInt = #line)
     -> Bool {
-    return EarlGreyImpl.invoked(fromFile: file, lineNumber: line)
-      .rotateDevice(to: orientation,
-                    errorOrNil: errorOrNil)
+    return EarlGreyImpl.invoked(fromFile: file.description, lineNumber: line)
+             .rotateDevice(to: orientation,
+                           errorOrNil: errorOrNil)
   }
 }
 
 extension GREYInteraction {
   @discardableResult public func assert(_ matcher: @autoclosure () -> GREYMatcher) -> Self {
-    return self.assert(with:matcher())
+    return self.__assert(with: matcher())
   }
 
   @discardableResult public func assert(_ matcher: @autoclosure () -> GREYMatcher,
                                         error:UnsafeMutablePointer<NSError?>!) -> Self {
-    return self.assert(with: matcher(), error: error)
+    return self.__assert(with: matcher(), error: error)
   }
 
+  @available(*, deprecated, renamed: "assert(_:)")
+  @discardableResult public func assert(with matcher: GREYMatcher!) -> Self {
+    return self.__assert(with: matcher)
+  }
+
+  @available(*, deprecated, renamed: "assert(_:error:)")
+  @discardableResult public func assert(with matcher: GREYMatcher!,
+                                        error:UnsafeMutablePointer<NSError?>!) -> Self {
+    return self.__assert(with: matcher, error: error)
+  }
+
+  @discardableResult public func perform(_ action: GREYAction!) -> Self {
+    return self.__perform(action)
+  }
+
+  @discardableResult public func perform(_ action: GREYAction!,
+                                         error:UnsafeMutablePointer<NSError?>!) -> Self {
+    return self.__perform(action, error: error)
+  }
 
   @discardableResult public func using(searchAction: GREYAction,
                                        onElementWithMatcher matcher: GREYMatcher) -> Self {
     return self.usingSearch(searchAction, onElementWith: matcher)
+  }
+}
+
+extension GREYCondition {
+  open func waitWithTimeout(seconds: CFTimeInterval) -> Bool {
+    return self.wait(withTimeout: seconds)
+  }
+
+  open func waitWithTimeout(seconds: CFTimeInterval, pollInterval: CFTimeInterval)
+    -> Bool {
+    return self.wait(withTimeout: seconds, pollInterval: pollInterval)
   }
 }

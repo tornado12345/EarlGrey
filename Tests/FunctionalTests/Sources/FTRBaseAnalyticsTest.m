@@ -16,11 +16,10 @@
 
 #import "FTRBaseAnalyticsTest.h"
 
-#import <EarlGrey/EarlGrey.h>
-#import <EarlGrey/GREYAnalytics.h>
-#import <EarlGrey/GREYAnalyticsDelegate.h>
-
 #import "FTRAssertionHandler.h"
+#import "Common/GREYAnalytics.h"
+#import "Common/GREYAnalyticsDelegate.h"
+#import <EarlGrey/GREYConfiguration.h>
 
 /**
  *  A constant used for asserting mismatched analytics hits, this is set to be a global to allow for
@@ -105,16 +104,18 @@ static NSInteger gTotalHitsExpected;
 #pragma mark - Private
 
 - (void)trackEventWithTrackingID:(NSString *)trackingID
+                        clientID:(NSString *)clientID
                         category:(NSString *)category
-                     subCategory:(NSString *)subCategory
-                           value:(NSNumber *)valueOrNil {
+                          action:(NSString *)action
+                           value:(NSString *)value {
   NSAssert([NSThread isMainThread], @"The tests expects that Analytics delegate is invoked on "
                                     @"main thread.");
   gTotalHitsReceived += 1;
   [gOriginalAnalyticsDelegate trackEventWithTrackingID:trackingID
+                                              clientID:clientID
                                               category:category
-                                           subCategory:subCategory
-                                                 value:valueOrNil];
+                                                action:action
+                                                 value:value];
 }
 
 @end

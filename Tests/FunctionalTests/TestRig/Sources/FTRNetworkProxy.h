@@ -14,6 +14,8 @@
 // limitations under the License.
 //
 
+#import <Foundation/Foundation.h>
+
 /**
  *  An NSURLProtocol based network proxy for proxying HTTP requests.
  */
@@ -30,6 +32,11 @@
  *  @param enabled A BOOL specifing whether to enable or disable the proxy.
  */
 + (void)ftr_setProxyEnabled:(BOOL)enabled;
+
+/**
+ *  Sets the simulated network delay that all proxied requests take to complete.
+ */
++ (void)ftr_setSimulatedNetworkDelay:(NSTimeInterval)delayInSeconds;
 
 /**
  *  Adds a proxy rule that configures the proxy to serve the given @c data for all URLs matching the

@@ -14,13 +14,13 @@
 // limitations under the License.
 //
 
-#import <EarlGrey/GREYConfiguration.h>
-#import <EarlGrey/GREYElementMatcherBlock.h>
-#import <EarlGrey/GREYExposed.h>
-#import <EarlGrey/GREYMatchers.h>
-#import <EarlGrey/GREYUIWindowProvider.h>
 #import <OCMock/OCMock.h>
 
+#import "Common/GREYAppleInternals.h"
+#import <EarlGrey/GREYConfiguration.h>
+#import <EarlGrey/GREYElementMatcherBlock.h>
+#import <EarlGrey/GREYMatchers.h>
+#import "Provider/GREYUIWindowProvider.h"
 #import "GREYBaseTest.h"
 
 static NSMutableArray *gAppWindows;

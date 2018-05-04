@@ -14,9 +14,13 @@
 // limitations under the License.
 //
 
+#import <UIKit/UIKit.h>
+
 @interface FTRActivityIndicatorViewController : UIViewController
 
 @property(nonatomic, retain) IBOutlet UIActivityIndicatorView *activityIndicator;
 @property(nonatomic, retain) IBOutlet UILabel *status;
+
+- (instancetype)init NS_UNAVAILABLE;
 
 @end

@@ -16,6 +16,8 @@
 
 #import "FTRBaseIntegrationTest.h"
 
+#import <EarlGrey/EarlGrey.h>
+
 @implementation FTRBaseIntegrationTest {
   // This variable holds the current failure handler before any tests sully it.
   id<GREYFailureHandler> _currentFailureHandler;
@@ -23,7 +25,8 @@
 
 - (void)setUp {
   [super setUp];
-  _currentFailureHandler = greyFailureHandler;
+  _currentFailureHandler =
+      [[[NSThread currentThread] threadDictionary] valueForKey:kGREYFailureHandlerKey];
   // By default, make all tests assume portrait position.
   [EarlGrey rotateDeviceToOrientation:UIDeviceOrientationPortrait errorOrNil:nil];
 }

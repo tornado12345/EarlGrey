@@ -19,6 +19,7 @@
 #import "Action/GREYAction.h"
 #import "Action/GREYActionBlock.h"
 #import "Action/GREYChangeStepperAction.h"
+#import "Action/GREYMultiFingerSwipeAction.h"
 #import "Action/GREYPickerAction.h"
 #import "Action/GREYPinchAction.h"
 #import "Action/GREYScrollAction.h"
@@ -31,8 +32,10 @@
 #import "Additions/NSString+GREYAdditions.h"
 #import "Additions/UISwitch+GREYAdditions.h"
 #import "Assertion/GREYAssertionDefines.h"
-#import "Common/GREYExposed.h"
+#import "Common/GREYAppleInternals.h"
+#import "Common/GREYError.h"
 #import "Common/GREYScreenshotUtil.h"
+#import "Common/GREYThrowDefines.h"
 #import "Core/GREYInteraction.h"
 #import "Core/GREYKeyboard.h"
 #import "Matcher/GREYAllOf.h"
@@ -43,7 +46,17 @@
 #import "Synchronization/GREYUIThreadExecutor.h"
 #import "Synchronization/GREYUIWebViewIdlingResource.h"
 
+static Class gWebAccessibilityObjectWrapperClass;
+static Class gAccessibilityTextFieldElementClass;
+
 @implementation GREYActions
+
++ (void)initialize {
+  if (self == [GREYActions class]) {
+    gWebAccessibilityObjectWrapperClass = NSClassFromString(@"WebAccessibilityObjectWrapper");
+    gAccessibilityTextFieldElementClass = NSClassFromString(@"UIAccessibilityTextFieldElement");
+  }
+}
 
 + (id<GREYAction>)actionForSwipeFastInDirection:(GREYDirection)direction {
   return [[GREYSwipeAction alloc] initWithDirection:direction duration:kGREYSwipeFastDuration];
@@ -71,12 +84,54 @@
                                                                 yOriginStartPercentage)];
 }
 
-+ (id<GREYAction>)actionForPinchFastInDirection:(GREYPinchDirection)pinchDirection {
-  return [[GREYPinchAction alloc] initWithDirection:pinchDirection duration:kGREYPinchFastDuration];
++ (id<GREYAction>)actionForMultiFingerSwipeSlowInDirection:(GREYDirection)direction
+                                           numberOfFingers:(NSUInteger)numberOfFingers {
+  return [[GREYMultiFingerSwipeAction alloc] initWithDirection:direction
+                                                      duration:kGREYSwipeSlowDuration
+                                               numberOfFingers:numberOfFingers];
 }
 
-+ (id<GREYAction>)actionForPinchSlowInDirection:(GREYPinchDirection)pinchDirection {
-  return [[GREYPinchAction alloc] initWithDirection:pinchDirection duration:kGREYPinchSlowDuration];
++ (id<GREYAction>)actionForMultiFingerSwipeFastInDirection:(GREYDirection)direction
+                                           numberOfFingers:(NSUInteger)numberOfFingers {
+  return [[GREYMultiFingerSwipeAction alloc] initWithDirection:direction
+                                                      duration:kGREYSwipeFastDuration
+                                               numberOfFingers:numberOfFingers];
+}
+
++ (id<GREYAction>)actionForMultiFingerSwipeSlowInDirection:(GREYDirection)direction
+                                           numberOfFingers:(NSUInteger)numberOfFingers
+                                    xOriginStartPercentage:(CGFloat)xOriginStartPercentage
+                                    yOriginStartPercentage:(CGFloat)yOriginStartPercentage {
+  return [[GREYMultiFingerSwipeAction alloc] initWithDirection:direction
+                                                      duration:kGREYSwipeSlowDuration
+                                               numberOfFingers:numberOfFingers
+                                                 startPercents:CGPointMake(xOriginStartPercentage,
+                                                                           yOriginStartPercentage)];
+}
+
++ (id<GREYAction>)actionForMultiFingerSwipeFastInDirection:(GREYDirection)direction
+                                           numberOfFingers:(NSUInteger)numberOfFingers
+                                    xOriginStartPercentage:(CGFloat)xOriginStartPercentage
+                                    yOriginStartPercentage:(CGFloat)yOriginStartPercentage {
+  return [[GREYMultiFingerSwipeAction alloc] initWithDirection:direction
+                                                      duration:kGREYSwipeFastDuration
+                                               numberOfFingers:numberOfFingers
+                                                 startPercents:CGPointMake(xOriginStartPercentage,
+                                                                           yOriginStartPercentage)];
+}
+
++ (id<GREYAction>)actionForPinchFastInDirection:(GREYPinchDirection)pinchDirection
+                                      withAngle:(double)angle {
+  return [[GREYPinchAction alloc] initWithDirection:pinchDirection
+                                           duration:kGREYPinchFastDuration
+                                         pinchAngle:angle];
+}
+
++ (id<GREYAction>)actionForPinchSlowInDirection:(GREYPinchDirection)pinchDirection
+                                      withAngle:(double)angle {
+  return [[GREYPinchAction alloc] initWithDirection:pinchDirection
+                                           duration:kGREYPinchSlowDuration
+                                         pinchAngle:angle];
 }
 
 + (id<GREYAction>)actionForMoveSliderToValue:(float)value {
@@ -172,7 +227,8 @@
 + (id<GREYAction>)actionForClearText {
   id<GREYMatcher> constraints =
       grey_anyOf(grey_respondsToSelector(@selector(text)),
-                 grey_kindOfClass(NSClassFromString(@"WebAccessibilityObjectWrapper")),
+                 grey_kindOfClass(gAccessibilityTextFieldElementClass),
+                 grey_kindOfClass(gWebAccessibilityObjectWrapperClass),
                  grey_conformsToProtocol(@protocol(UITextInput)),
                  nil);
   return [GREYActionBlock actionWithName:@"Clear text"
@@ -180,8 +236,10 @@
                             performBlock:^BOOL (id element, __strong NSError **errorOrNil) {
     NSString *textStr;
     if ([element grey_isWebAccessibilityElement]) {
-      [GREYActions grey_webClearText:element];
+      [GREYActions grey_setText:@"" onWebElement:element];
       return YES;
+    } else if ([element isKindOfClass:gAccessibilityTextFieldElementClass]) {
+      element = [element textField];
     } else if ([element respondsToSelector:@selector(text)]) {
       textStr = [element text];
     } else {
@@ -232,7 +290,7 @@
 }
 
 + (id<GREYAction>)actionForJavaScriptExecution:(NSString *)js
-                                        output:(out __strong NSString **)outResult {
+                                        output:(__strong NSString **)outResult {
   // TODO: JS Errors should be propagated up.
   id<GREYMatcher> constraints = grey_allOf(grey_not(grey_systemAlertViewShown()),
                                            grey_kindOfClass([UIWebView class]),
@@ -252,18 +310,18 @@
   }];
 }
 
-+ (id<GREYAction>)actionForSnapshot:(out __strong UIImage **)outImage {
-  NSParameterAssert(outImage);
++ (id<GREYAction>)actionForSnapshot:(__strong UIImage **)outImage {
+  GREYThrowOnNilParameter(outImage);
 
   return [[GREYActionBlock alloc] initWithName:@"Element Snapshot"
                                    constraints:nil
                                   performBlock:^BOOL (id element, __strong NSError **errorOrNil) {
     UIImage *snapshot = [GREYScreenshotUtil snapshotElement:element];
     if (snapshot == nil) {
-      [NSError grey_logOrSetOutReferenceIfNonNil:errorOrNil
-                                      withDomain:kGREYInteractionErrorDomain
-                                            code:kGREYInteractionActionFailedErrorCode
-                            andDescriptionFormat:@"Failed to take snapshot. Snapshot is nil."];
+      GREYPopulateErrorOrLog(errorOrNil,
+                             kGREYInteractionErrorDomain,
+                             kGREYInteractionActionFailedErrorCode,
+                             @"Failed to take snapshot. Snapshot is nil.");
       return NO;
     } else {
       *outImage = snapshot;
@@ -275,21 +333,12 @@
 #pragma mark - Private
 
 /**
- *  Clears WebView input text value.
- *
- *  @param element The element to target
- */
-+ (void)grey_webClearText:(id)element {
-  [GREYActions grey_webSetText:element text:@""];
-}
-
-/**
  *  Sets WebView input text value.
  *
  *  @param element The element to target
  *  @param text The text to set
  */
-+ (void)grey_webSetText:(id)element text:(NSString *)text {
++ (void)grey_setText:(NSString *)text onWebElement:(id)element {
   // Input tags can be identified by having the 'title' attribute set, or current value.
   // Associating a <label> tag to the input tag does NOT result in an iOS accessibility element.
   if (!text) {
@@ -325,15 +374,19 @@
   SEL setTextSelector = NSSelectorFromString(@"setText:");
   id<GREYMatcher> constraints =
       grey_anyOf(grey_respondsToSelector(setTextSelector),
-                 grey_kindOfClass(NSClassFromString(@"WebAccessibilityObjectWrapper")),
+                 grey_kindOfClass(gAccessibilityTextFieldElementClass),
+                 grey_kindOfClass(gWebAccessibilityObjectWrapperClass),
                  nil);
   NSString *replaceActionName = [NSString stringWithFormat:@"Replace with text: \"%@\"", text];
   return [GREYActionBlock actionWithName:replaceActionName
                              constraints:constraints
                             performBlock:^BOOL (id element, __strong NSError **errorOrNil) {
     if ([element grey_isWebAccessibilityElement]) {
-      [GREYActions grey_webSetText:element text:text];
+      [GREYActions grey_setText:text onWebElement:element];
     } else {
+      if ([element isKindOfClass:gAccessibilityTextFieldElementClass]) {
+        element = [element textField];
+      }
       BOOL elementIsUIControl = [element isKindOfClass:[UIControl class]];
       BOOL elementIsUITextField = [element isKindOfClass:[UITextField class]];
 
@@ -380,90 +433,6 @@
 }
 
 /**
- *  Use the iOS keyboard to type a string starting from the provided UITextPosition. If the
- *  position is @c nil, then type text from the text input's current position. Should only be called
- *  with a position if element conforms to the UITextInput protocol - which it should if you
- *  derived the UITextPosition from the element.
- *
- *  @param text     The text to be typed.
- *  @param position The position in the text field at which the text is to be typed.
- *
- *  @return @c YES if the action succeeded, else @c NO. If an action returns @c NO, it does not
- *          mean that the action was not performed at all but somewhere during the action execution
- *          the error occured and so the UI may be in an unrecoverable state.
- */
-+ (id<GREYAction>)grey_actionForTypeText:(NSString *)text
-                        atUITextPosition:(UITextPosition *)position {
-  return [GREYActionBlock actionWithName:[NSString stringWithFormat:@"Type \"%@\"", text]
-                             constraints:grey_not(grey_systemAlertViewShown())
-                            performBlock:^BOOL (id element, __strong NSError **errorOrNil) {
-    UIView *expectedFirstResponderView;
-    if (![element isKindOfClass:[UIView class]]) {
-      expectedFirstResponderView = [element grey_viewContainingSelf];
-    } else {
-      expectedFirstResponderView = element;
-    }
-
-    // If expectedFirstResponderView or one of its ancestors isn't the first responder, tap on
-    // it so it becomes the first responder.
-    if (![expectedFirstResponderView isFirstResponder] &&
-        ![grey_ancestor(grey_firstResponder()) matches:expectedFirstResponderView]) {
-      // Tap on the element to make expectedFirstResponderView a first responder.
-      if (![[GREYActions actionForTap] perform:element error:errorOrNil]) {
-        return NO;
-      }
-      // Wait for keyboard to show up and any other UI changes to take effect.
-      if (![GREYKeyboard waitForKeyboardToAppear]) {
-        NSString *description = @"Keyboard did not appear after tapping on %@. Are you sure that "
-            @"tapping on this element will bring up the keyboard?";
-        [NSError grey_logOrSetOutReferenceIfNonNil:errorOrNil
-                                        withDomain:kGREYInteractionErrorDomain
-                                              code:kGREYInteractionActionFailedErrorCode
-                              andDescriptionFormat:description, element];
-        return NO;
-      }
-    }
-
-    // If a position is given, move the text cursor to that position.
-    id firstResponder = [[expectedFirstResponderView window] firstResponder];
-    if (position) {
-      if ([firstResponder conformsToProtocol:@protocol(UITextInput)]) {
-        UITextRange *newRange = [firstResponder textRangeFromPosition:position toPosition:position];
-        [firstResponder setSelectedTextRange:newRange];
-      } else {
-        NSString *description = @"First Responder %@ of element %@ does not conform to UITextInput"
-            @" protocol.";
-        [NSError grey_logOrSetOutReferenceIfNonNil:errorOrNil
-                                        withDomain:kGREYInteractionErrorDomain
-                                              code:kGREYInteractionActionFailedErrorCode
-                              andDescriptionFormat:description,
-                                                   firstResponder,
-                                                   expectedFirstResponderView];
-        return NO;
-      }
-    }
-
-    BOOL retVal;
-
-    if (iOS8_2_OR_ABOVE()) {
-      // Directly perform the typing since for iOS8.2 and above, we directly turn off Autocorrect
-      // and Predictive Typing from the settings.
-      retVal = [self grey_withAutocorrectAlreadyDisabledTypeText:text
-                                                inFirstResponder:firstResponder
-                                                       withError:errorOrNil];
-    } else {
-      // Perform typing. If this is pre-iOS8.2, then we simply turn the autocorrection
-      // off the current textfield being typed in.
-      retVal = [self grey_disableAutoCorrectForDelegateAndTypeText:text
-                                                  inFirstResponder:firstResponder
-                                                         withError:errorOrNil];
-    }
-
-    return retVal;
-  }];
-}
-
-/**
  *  Performs typing in the provided element by turning off autocorrect. In case of OS versions
  *  that provide an easy API to turn off autocorrect from the settings, we do that, else we obtain
  *  the element being typed in, and turn off autocorrect for that element while being typed on.
@@ -497,74 +466,105 @@
   // since we reset the delegate in the grey_setAutocorrectionType:forIntance:
   // withOriginalKeyboardDelegate:withKeyboardToggling method in order for the autocorrection type
   // change to take effect.
+  BOOL toggleKeyboard = iOS8_1_OR_ABOVE();
   id keyboardInstance = [UIKeyboardImpl sharedInstance];
   id originalKeyboardDelegate = [keyboardInstance delegate];
   UITextAutocorrectionType originalAutoCorrectionType =
       [originalKeyboardDelegate autocorrectionType];
   // For a copy of the keyboard's delegate, turn the autocorrection off. Set this copy back
   // as the delegate.
-  [self grey_setAutocorrectionType:UITextAutocorrectionTypeNo
-                       forInstance:keyboardInstance
-      withOriginalKeyboardDelegate:originalKeyboardDelegate
-              withKeyboardToggling:iOS8_1_OR_ABOVE()];
-
+  if (toggleKeyboard) {
+    [keyboardInstance hideKeyboard];
+  }
+  [originalKeyboardDelegate setAutocorrectionType:UITextAutocorrectionTypeNo];
+  [keyboardInstance setDelegate:originalKeyboardDelegate];
+  if (toggleKeyboard) {
+    [keyboardInstance showKeyboard];
+  }
   // Type the string in the delegate text field.
   BOOL typingResult = [GREYKeyboard typeString:text
                               inFirstResponder:firstResponder
                                          error:errorOrNil];
 
   // Reset the keyboard delegate's autocorrection back to the original one.
-  [self grey_setAutocorrectionType:originalAutoCorrectionType
-                       forInstance:keyboardInstance
-      withOriginalKeyboardDelegate:originalKeyboardDelegate
-              withKeyboardToggling:NO];
+  [originalKeyboardDelegate setAutocorrectionType:originalAutoCorrectionType];
+  [keyboardInstance setDelegate:originalKeyboardDelegate];
+
   return typingResult;
 }
 
-/**
- *  For the particular element being typed in, signified by the delegate of the keyboard instance
- *  turn off autocorrection. To provide a delay in this action, we can also hide and show the
- *  keyboard.
- *
- *  @param autoCorrectionType         The autocorrection type to set the current keyboard to.
- *  @param keyboardInstance           The active keyboard instance.
- *  @param toggleKeyboardVisibilityOn A switch to show/hide the keyboard.
- *
- */
-+ (void)grey_setAutocorrectionType:(BOOL)autoCorrectionType
-                       forInstance:(id)keyboardInstance
-      withOriginalKeyboardDelegate:(id)keyboardDelegate
-              withKeyboardToggling:(BOOL)toggleKeyboardVisibilityOn {
-  if (toggleKeyboardVisibilityOn) {
-    [keyboardInstance hideKeyboard];
-  }
-  [keyboardDelegate setAutocorrectionType:autoCorrectionType];
-  [keyboardInstance setDelegate:keyboardDelegate];
-  if (toggleKeyboardVisibilityOn) {
-    [keyboardInstance showKeyboard];
-  }
-}
+#pragma mark - Package Internal
 
-/**
- *  Directly perform typing without any changes in the first responder element whatsoever.
- *
- *  @param      text           The text to be typed.
- *  @param      firstResponder The element the action is to be performed on.
- *                             This must not be @c nil.
- *  @param[out] errorOrNil     Error that will be populated on failure. The implementing class
- *                             should handle the behavior when it is @c nil by, for example,
- *                             logging the error or throwing an exception.
- *
- *  @return @c YES if the action succeeded, else @c NO. If an action returns @c NO, it does not
- *          mean that the action was not performed at all but somewhere during the action execution
- *          the error occured and so the UI may be in an unrecoverable state.
- */
-+ (BOOL)grey_withAutocorrectAlreadyDisabledTypeText:(NSString *)text
-                                   inFirstResponder:firstResponder
-                                          withError:(__strong NSError **)errorOrNil {
-  // Perform typing. This requires autocorrect to be turned off. In
-  // the case of iOS8+, this is done through the Keyboard Settings bundle.
-  return [GREYKeyboard typeString:text inFirstResponder:firstResponder error:errorOrNil];
++ (id<GREYAction>)grey_actionForTypeText:(NSString *)text
+                        atUITextPosition:(UITextPosition *)position {
+  return [GREYActionBlock actionWithName:[NSString stringWithFormat:@"Type '%@'", text]
+                             constraints:grey_not(grey_systemAlertViewShown())
+                            performBlock:^BOOL (id element, __strong NSError **errorOrNil) {
+    UIView *expectedFirstResponderView;
+    if (![element isKindOfClass:[UIView class]]) {
+      expectedFirstResponderView = [element grey_viewContainingSelf];
+    } else {
+      expectedFirstResponderView = element;
+    }
+
+    // If expectedFirstResponderView or one of its ancestors isn't the first responder, tap on
+    // it so it becomes the first responder.
+    if (![expectedFirstResponderView isFirstResponder] &&
+        ![grey_ancestor(grey_firstResponder()) matches:expectedFirstResponderView]) {
+      // Tap on the element to make expectedFirstResponderView a first responder.
+      if (![[GREYActions actionForTap] perform:element error:errorOrNil]) {
+        return NO;
+      }
+      // Wait for keyboard to show up and any other UI changes to take effect.
+      if (![GREYKeyboard waitForKeyboardToAppear]) {
+        NSString *description = @"Keyboard did not appear after tapping on element [E]. "
+            @"Are you sure that tapping on this element will bring up the keyboard?";
+        NSDictionary *glossary = @{ @"E" : [element grey_description] };
+        GREYPopulateErrorNotedOrLog(errorOrNil,
+                                    kGREYInteractionErrorDomain,
+                                    kGREYInteractionActionFailedErrorCode,
+                                    description,
+                                    glossary);
+        return NO;
+      }
+    }
+
+    // If a position is given, move the text cursor to that position.
+    id firstResponder = [[expectedFirstResponderView window] firstResponder];
+    if (position) {
+      if ([firstResponder conformsToProtocol:@protocol(UITextInput)]) {
+        UITextRange *newRange = [firstResponder textRangeFromPosition:position toPosition:position];
+        [firstResponder setSelectedTextRange:newRange];
+      } else {
+        NSString *description = @"First responder [F] of element [E] does not conform to "
+                                @"UITextInput protocol.";
+        NSDictionary *glossary = @{ @"F" : [firstResponder description],
+                                    @"E" : [expectedFirstResponderView description] };
+        GREYPopulateErrorNotedOrLog(errorOrNil,
+                                    kGREYInteractionErrorDomain,
+                                    kGREYInteractionActionFailedErrorCode,
+                                    description,
+                                    glossary);
+        return NO;
+      }
+    }
+
+    BOOL retVal;
+
+    if (iOS8_2_OR_ABOVE()) {
+      // Directly perform the typing since for iOS8.2 and above, we directly turn off Autocorrect
+      // and Predictive Typing from the settings.
+      retVal = [GREYKeyboard typeString:text inFirstResponder:firstResponder error:errorOrNil];
+    } else {
+      // Perform typing. If this is pre-iOS8.2, then we simply turn the autocorrection
+      // off the current textfield being typed in.
+      retVal = [self grey_disableAutoCorrectForDelegateAndTypeText:text
+                                                  inFirstResponder:firstResponder
+                                                         withError:errorOrNil];
+    }
+
+    return retVal;
+  }];
 }
 
 @end
@@ -645,12 +645,46 @@ id<GREYAction> grey_swipeSlowInDirectionWithStartPoint(GREYDirection direction,
                              yOriginStartPercentage:yOriginStartPercentage];
 }
 
-id<GREYAction> grey_pinchFastInDirection(GREYPinchDirection pinchDirection) {
-  return [GREYActions actionForPinchFastInDirection:pinchDirection];
+id<GREYAction> grey_multiFingerSwipeSlowInDirection(GREYDirection direction,
+                                                    NSUInteger numberOfFingers) {
+  return [GREYActions actionForMultiFingerSwipeSlowInDirection:direction
+                                               numberOfFingers:numberOfFingers];
 }
 
-id<GREYAction> grey_pinchSlowInDirection(GREYPinchDirection pinchDirection) {
-  return [GREYActions actionForPinchSlowInDirection:pinchDirection];
+id<GREYAction> grey_multiFingerSwipeFastInDirection(GREYDirection direction,
+                                                    NSUInteger numberOfFingers) {
+  return [GREYActions actionForMultiFingerSwipeFastInDirection:direction
+                                               numberOfFingers:numberOfFingers];
+}
+
+id<GREYAction> grey_multiFingerSwipeSlowInDirectionWithStartPoint(GREYDirection direction,
+                                                                  NSUInteger numberOfFingers,
+                                                                  CGFloat xOriginStartPercentage,
+                                                                  CGFloat yOriginStartPercentage) {
+  return [GREYActions actionForMultiFingerSwipeSlowInDirection:direction
+                                               numberOfFingers:numberOfFingers
+                                        xOriginStartPercentage:xOriginStartPercentage
+                                        yOriginStartPercentage:yOriginStartPercentage];
+}
+
+id<GREYAction> grey_multiFingerSwipeFastInDirectionWithStartPoint(GREYDirection direction,
+                                                                  NSUInteger numberOfFingers,
+                                                                  CGFloat xOriginStartPercentage,
+                                                                  CGFloat yOriginStartPercentage) {
+  return [GREYActions actionForMultiFingerSwipeFastInDirection:direction
+                                               numberOfFingers:numberOfFingers
+                                        xOriginStartPercentage:xOriginStartPercentage
+                                        yOriginStartPercentage:yOriginStartPercentage];
+}
+
+id<GREYAction> grey_pinchFastInDirectionAndAngle(GREYPinchDirection pinchDirection,
+                                                 double angle) {
+  return [GREYActions actionForPinchFastInDirection:pinchDirection withAngle:angle];
+}
+
+id<GREYAction> grey_pinchSlowInDirectionAndAngle(GREYPinchDirection pinchDirection,
+                                                 double angle) {
+  return [GREYActions actionForPinchSlowInDirection:pinchDirection withAngle:angle];
 }
 
 id<GREYAction> grey_moveSliderToValue(float value) {

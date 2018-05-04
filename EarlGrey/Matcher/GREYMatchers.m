@@ -20,16 +20,21 @@
 #import <UIKit/UIKit.h>
 #include <tgmath.h>
 
+#import "Additions/NSObject+GREYAdditions.h"
 #import "Additions/NSString+GREYAdditions.h"
 #import "Additions/UISwitch+GREYAdditions.h"
+#import "Additions/NSError+GREYAdditions.h"
 #import "Assertion/GREYAssertionDefines.h"
+#import "Common/GREYAppleInternals.h"
 #import "Common/GREYConfiguration.h"
 #import "Common/GREYConstants.h"
-#import "Common/GREYExposed.h"
-#import "Common/GREYPrivate.h"
+#import "Common/GREYError.h"
+#import "Common/GREYFatalAsserts.h"
+#import "Common/GREYThrowDefines.h"
 #import "Common/GREYVisibilityChecker.h"
 #import "Core/GREYElementFinder.h"
 #import "Core/GREYElementInteraction.h"
+#import "Core/GREYElementInteraction+Internal.h"
 #import "Matcher/GREYAllOf.h"
 #import "Matcher/GREYAnyOf.h"
 #import "Matcher/GREYElementMatcherBlock.h"
@@ -88,7 +93,7 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
              isEqualToAccessibilityString:label];
   };
   DescribeToBlock describe = ^void(id<GREYDescription> description) {
-    [description appendText:[NSString stringWithFormat:@"accessibilityLabel(\"%@\")", label]];
+    [description appendText:[NSString stringWithFormat:@"accessibilityLabel('%@')", label]];
   };
   return grey_allOf(grey_accessibilityElement(),
                     [[GREYElementMatcherBlock alloc] initWithMatchesBlock:matches
@@ -104,7 +109,7 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
     return [element.accessibilityIdentifier isEqualToString:accessibilityID];
   };
   DescribeToBlock describe = ^void(id<GREYDescription> description) {
-    [description appendText:[NSString stringWithFormat:@"accessibilityID(\"%@\")",
+    [description appendText:[NSString stringWithFormat:@"accessibilityID('%@')",
                                                        accessibilityID]];
   };
   return grey_allOf(grey_respondsToSelector(@selector(accessibilityIdentifier)),
@@ -122,7 +127,7 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
              isEqualToAccessibilityString:value];
   };
   DescribeToBlock describe = ^void(id<GREYDescription> description) {
-    [description appendText:[NSString stringWithFormat:@"accessibilityValue(\"%@\")",
+    [description appendText:[NSString stringWithFormat:@"accessibilityValue('%@')",
                                                        value]];
   };
   return grey_allOf(grey_accessibilityElement(),
@@ -145,16 +150,16 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
                     nil);
 }
 
-+ (id<GREYMatcher>)matcherForAccessibilityHint:(NSString *)hint {
++ (id<GREYMatcher>)matcherForAccessibilityHint:(id)hint {
   MatchesBlock matches = ^BOOL(NSObject *element) {
-    if (element.accessibilityHint == hint) {
+    id accessibilityHint = element.accessibilityHint;
+    if (accessibilityHint == hint) {
       return YES;
     }
-    return [self grey_accessibilityString:element.accessibilityHint
-             isEqualToAccessibilityString:hint];
+    return [self grey_accessibilityString:accessibilityHint isEqualToAccessibilityString:hint];
   };
   DescribeToBlock describe = ^void(id<GREYDescription> description) {
-    [description appendText:[NSString stringWithFormat:@"accessibilityHint(\"%@\")", hint]];
+    [description appendText:[NSString stringWithFormat:@"accessibilityHint('%@')", hint]];
   };
   return grey_allOf(grey_accessibilityElement(),
                     [[GREYElementMatcherBlock alloc] initWithMatchesBlock:matches
@@ -176,10 +181,19 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
 }
 
 + (id<GREYMatcher>)matcherForText:(NSString *)text {
+  MatchesBlock matches = ^BOOL(id element) {
+    return [[element text] isEqualToString:text];
+  };
+  DescribeToBlock describe = ^void(id<GREYDescription> description) {
+    [description appendText:[NSString stringWithFormat:@"hasText('%@')", text]];
+  };
+  id<GREYMatcher> matcher = [[GREYElementMatcherBlock alloc] initWithMatchesBlock:matches
+                                                                 descriptionBlock:describe];
   return grey_allOf(grey_anyOf(grey_kindOfClass([UILabel class]),
                                grey_kindOfClass([UITextField class]),
                                grey_kindOfClass([UITextView class]), nil),
-                    hasProperty(@"text", text), nil);
+                    matcher,
+                    nil);
 }
 
 + (id<GREYMatcher>)matcherForFirstResponder {
@@ -207,7 +221,8 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
 }
 
 + (id<GREYMatcher>)matcherForMinimumVisiblePercent:(CGFloat)percent {
-  NSAssert(percent >= 0.0f && percent <= 1.0f, @"Percent %f must be in the range [0,1]", percent);
+  GREYFatalAssertWithMessage(percent >= 0.0f && percent <= 1.0f,
+                             @"Percent %f must be in the range [0,1]", percent);
   MatchesBlock matches = ^BOOL(UIView *element) {
     return [GREYVisibilityChecker percentVisibleAreaOfElement:element] > percent;
   };
@@ -265,13 +280,11 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
 }
 
 + (id<GREYMatcher>)matcherForKindOfClass:(Class)klass {
-  NSParameterAssert(klass);
-
   MatchesBlock matches = ^BOOL(id element) {
     return [element isKindOfClass:klass];
   };
   DescribeToBlock describe = ^void(id<GREYDescription> description) {
-    [description appendText:[NSString stringWithFormat:@"kindOfClass(\"%@\")",
+    [description appendText:[NSString stringWithFormat:@"kindOfClass('%@')",
                                                        NSStringFromClass(klass)]];
   };
   return [[GREYElementMatcherBlock alloc] initWithMatchesBlock:matches descriptionBlock:describe];
@@ -282,7 +295,7 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
     return [comparisonMatcher matches:@(element.progress)];
   };
   DescribeToBlock describe = ^void(id<GREYDescription> description) {
-    [description appendText:[NSString stringWithFormat:@"progressValueThatMatches(\"%@\")",
+    [description appendText:[NSString stringWithFormat:@"progressValueThatMatches('%@')",
                                                        comparisonMatcher]];
   };
   return grey_allOf(grey_kindOfClass([UIProgressView class]),
@@ -329,8 +342,8 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
     return NO;
   };
   DescribeToBlock describe = ^void(id<GREYDescription> description) {
-    [description appendText:[NSString stringWithFormat:@"ancestorThatMatches(%@)",
-                                ancestorMatcher]];
+    NSString *desc = [NSString stringWithFormat:@"ancestorThatMatches(%@)", ancestorMatcher];
+    [description appendText:desc];
   };
   return grey_allOf(grey_anyOf(grey_kindOfClass([UIView class]),
                                grey_respondsToSelector(@selector(accessibilityContainer)),
@@ -345,7 +358,6 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
     if (element == nil) {
       return NO;
     }
-
     GREYElementProvider *elementProvider =
         [[GREYElementProvider alloc] initWithRootElements:@[ element ]];
     NSEnumerator *elementEnumerator = [elementProvider dataEnumerator];
@@ -372,7 +384,7 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
     return [element.titleLabel.text isEqualToString:title];
   };
   DescribeToBlock describe = ^void(id<GREYDescription> description) {
-    [description appendText:[NSString stringWithFormat:@"buttonTitle(\"%@\")", title]];
+    [description appendText:[NSString stringWithFormat:@"buttonTitle('%@')", title]];
   };
   return grey_allOf(grey_kindOfClass([UIButton class]),
                     [[GREYElementMatcherBlock alloc] initWithMatchesBlock:matches
@@ -427,17 +439,31 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
       return NO;
     }
     NSInteger row = [element selectedRowInComponent:column];
-    NSString *rowLabel = [element.delegate pickerView:element
-                                          titleForRow:row
-                                         forComponent:column];
-    if ([rowLabel isEqualToString:value]) {
-      return YES;
-    } else {
-      return NO;
+    NSAttributedString *attributedRowLabel;
+    NSString *rowLabel;
+    id<UIPickerViewDelegate> delegate = element.delegate;
+    SEL attributedTitleSelector = @selector(pickerView:attributedTitleForRow:forComponent:);
+    SEL nonAttributedTitleSelector = @selector(pickerView:titleForRow:forComponent:);
+    if ([delegate respondsToSelector:attributedTitleSelector]) {
+      attributedRowLabel = [delegate pickerView:element
+                          attributedTitleForRow:row
+                                   forComponent:column];
+      if (attributedRowLabel == nil) {
+          rowLabel = [delegate pickerView:element
+                              titleForRow:row
+                             forComponent:column];
+      }
+    } else if ([delegate respondsToSelector:nonAttributedTitleSelector]) {
+      rowLabel = [delegate pickerView:element
+                          titleForRow:row
+                         forComponent:column];
     }
+    return rowLabel == value ||
+           [rowLabel isEqualToString:value] ||
+           [attributedRowLabel.string isEqualToString:value];
   };
   DescribeToBlock describe = ^void(id<GREYDescription> description) {
-    [description appendText:[NSString stringWithFormat:@"pickerColumnAtIndex(%ld) value(\"%@\")",
+    [description appendText:[NSString stringWithFormat:@"pickerColumnAtIndex(%ld) value('%@')",
                                                        (long)column, value]];
   };
   return grey_allOf(grey_kindOfClass([UIPickerView class]),
@@ -454,7 +480,7 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
     return [element.date isEqualToDate:value];
   };
   DescribeToBlock describe = ^void(id<GREYDescription> description) {
-    [description appendText:[NSString stringWithFormat:@"datePickerWithValue(\"%@\")", value]];
+    [description appendText:[NSString stringWithFormat:@"datePickerWithValue('%@')", value]];
   };
   return grey_allOf(grey_kindOfClass([UIDatePicker class]),
                     [[GREYElementMatcherBlock alloc] initWithMatchesBlock:matches
@@ -509,23 +535,47 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
 
 + (id<GREYMatcher>)matcherForConstraints:(NSArray *)constraints
               toReferenceElementMatching:(id<GREYMatcher>)referenceElementMatcher {
+  GREYThrowOnFailedConditionWithMessage(constraints.count > 0,
+                                        @"Please provide at least one constraint.");
+  GREYThrowOnNilParameterWithMessage(referenceElementMatcher, @"Nil reference matcher provided.");
+
   MatchesBlock matches = ^BOOL(id element) {
+    if (!element) {
+      return NO;
+    }
     // TODO: This causes searching the UI hierarchy multiple times for each element, refactor the
     // design to avoid this.
     GREYElementInteraction *interaction =
         [[GREYElementInteraction alloc] initWithElementMatcher:referenceElementMatcher];
-    NSError *matcherError;
-    NSArray *referenceElements = [interaction matchedElementsWithTimeout:0 error:&matcherError];
-    if (matcherError) {
-      I_GREYAssertTrue(NO, @"Error finding element: %@", matcherError);
-    } else if (referenceElements.count > 1) {
-      I_GREYAssertTrue(NO, @"More than one element matches the reference matcher: %@",
-                       referenceElements);
-    }
-
+    NSError *matchError;
+    NSArray *referenceElements = [interaction matchedElementsWithTimeout:0 error:&matchError];
     id referenceElement = [referenceElements firstObject];
     if (!referenceElement) {
-      I_GREYAssertTrue(NO, @"Could not find reference element.");
+      NSString *reason = @"Matcher for layout constraints failed: no UI element matching reference "
+                         @"element matcher was found.";
+      I_GREYElementNotFound(reason,
+                            @"Reference element matcher: %@",
+                            referenceElementMatcher);
+    } else if (referenceElements.count > 1) {
+      NSString *reason = @"Matcher for layout constraints failed: multiple UI elements matching "
+                         @"reference element matcher were found. Use grey_allOf(...) to create a "
+                         @"more specific reference element matcher.";
+      NSMutableArray *elementDescriptions =
+          [NSMutableArray arrayWithCapacity:referenceElements.count];
+      [elementDescriptions enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
+        [elementDescriptions addObject:[obj grey_description]];
+      }];
+      I_GREYMultipleElementsFound(reason,
+                                  @"Reference element matcher: %@\nMatched elements: %@",
+                                  referenceElementMatcher,
+                                  elementDescriptions);
+    }
+
+    // Reference element exists but still there was an error.
+    if (matchError) {
+      I_GREYFailWithDetails(@"An error occurred while trying to find the reference element.",
+                            @"Error was set even though 1 element was returned: %@",
+                            matchError);
     }
 
     for (GREYLayoutConstraint *constraint in constraints) {
@@ -535,17 +585,16 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
     }
     return YES;
   };
+
   DescribeToBlock describe = ^void(id<GREYDescription> description) {
     NSString *name =
         [NSString stringWithFormat:@"layoutWithConstraints(%@) referenceElementMatcher:(%@)",
-            referenceElementMatcher, [constraints componentsJoinedByString:@","]];
+                                   [constraints componentsJoinedByString:@","],
+                                   referenceElementMatcher];
     [description appendText:name];
   };
   // Nil elements do not have layout for matching layout constraints.
-  return grey_allOf(grey_notNil(),
-                    [[GREYElementMatcherBlock alloc] initWithMatchesBlock:matches
-                                                         descriptionBlock:describe],
-                    nil);
+  return [[GREYElementMatcherBlock alloc] initWithMatchesBlock:matches descriptionBlock:describe];
 }
 
 + (id<GREYMatcher>)matcherForNil {
@@ -553,7 +602,7 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
     return element == nil;
   };
   DescribeToBlock describe = ^void(id<GREYDescription> description) {
-    [description appendText:@"nil"];
+    [description appendText:@"isNil"];
   };
   return [[GREYElementMatcherBlock alloc] initWithMatchesBlock:matches descriptionBlock:describe];
 }
@@ -563,7 +612,7 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
     return element != nil;
   };
   DescribeToBlock describe = ^void(id<GREYDescription> description) {
-    [description appendText:@"notNil"];
+    [description appendText:@"isNotNil"];
   };
   return [[GREYElementMatcherBlock alloc] initWithMatchesBlock:matches descriptionBlock:describe];
 }
@@ -610,7 +659,20 @@ static const double kElementSufficientlyVisiblePercentage = 0.75;
                     nil);
 }
 
-#pragma mark - Private Methods
++ (id<GREYMatcher>)matcherForTextFieldValue:(NSString *)value {
+  MatchesBlock matches = ^BOOL(UITextField *textField) {
+    return [textField.text isEqualToString:value];
+  };
+  DescribeToBlock describe = ^void(id<GREYDescription> description) {
+    [description appendText:[NSString stringWithFormat:@"textFieldValue('%@')", value]];
+  };
+  return grey_allOf(grey_kindOfClass([UITextField class]),
+                    [[GREYElementMatcherBlock alloc] initWithMatchesBlock:matches
+                                                         descriptionBlock:describe],
+                    nil);
+}
+
+#pragma mark - Private
 
 /**
  * @return @c YES if the strings have the same string values, @c NO otherwise.
@@ -809,6 +871,10 @@ id<GREYMatcher> grey_greaterThan(id value) {
 
 id<GREYMatcher> grey_scrolledToContentEdge(GREYContentEdge edge) {
   return [GREYMatchers matcherForScrolledToContentEdge:edge];
+}
+
+id<GREYMatcher> grey_textFieldValue(NSString *value) {
+  return [GREYMatchers matcherForTextFieldValue:value];
 }
 
 #endif // GREY_DISABLE_SHORTHAND

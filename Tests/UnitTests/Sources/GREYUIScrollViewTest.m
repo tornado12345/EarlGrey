@@ -14,9 +14,10 @@
 // limitations under the License.
 //
 
-#import <EarlGrey/GREYExposed.h>
-
+#import "Common/GREYAppleInternals.h"
+#import "Synchronization/GREYAppStateTracker.h"
 #import "GREYBaseTest.h"
+
 
 @interface GREYUIScrollViewTest : GREYBaseTest
 @end

@@ -21,13 +21,10 @@
 #import "Additions/NSObject+GREYAdditions.h"
 #import "Assertion/GREYAssertionDefines.h"
 #import "Common/GREYConstants.h"
+#import "Common/GREYError.h"
+#import "Common/GREYThrowDefines.h"
 #import "Core/GREYInteraction.h"
 #import "Event/GREYSyntheticEvents.h"
-
-/**
- *  Number of events in a long press.
- */
-static const int kGREYLongPressEventCount = 60;
 
 @implementation GREYTapper
 
@@ -35,7 +32,8 @@ static const int kGREYLongPressEventCount = 60;
         numberOfTaps:(NSUInteger)numberOfTaps
             location:(CGPoint)location
                error:(__strong NSError **)errorOrNil {
-  NSParameterAssert(numberOfTaps > 0);
+  GREYThrowOnFailedCondition(numberOfTaps > 0);
+
   UIView *viewToTap =
       [element isKindOfClass:[UIView class]] ? element : [element grey_viewContainingSelf];
   UIWindow *window =
@@ -86,11 +84,7 @@ static const int kGREYLongPressEventCount = 60;
     return NO;
   }
 
-  NSMutableArray *touchPath = [[NSMutableArray alloc] init];
-  for (int i = 0; i < kGREYLongPressEventCount; i++) {
-    [touchPath addObject:[NSValue valueWithCGPoint:resolvedLocation]];
-  }
-
+  NSArray *touchPath = @[[NSValue valueWithCGPoint:resolvedLocation]];
   [GREYSyntheticEvents touchAlongPath:touchPath
                      relativeToWindow:window
                           forDuration:duration
@@ -145,14 +139,17 @@ static const int kGREYLongPressEventCount = 60;
   // Don't use frame because if transform property isn't identity matrix, the frame property is
   // undefined.
   if (!CGRectContainsPoint(window.bounds, location)) {
-    [NSError grey_logOrSetOutReferenceIfNonNil:errorOrNil
-                                  withDomain:kGREYInteractionErrorDomain
-                                        code:kGREYInteractionActionFailedErrorCode
-                        andDescriptionFormat:@"Cannot perform %@ at %@ as it is outside window's"
-                                             @" bounds %@",
-                                             name,
-                                             NSStringFromCGPoint(location),
-                                             NSStringFromCGRect(window.bounds)];
+    NSString *description = [NSString stringWithFormat:@"Cannot perform %@ at %@ "
+                                                       @"as it is outside window's bounds %@",
+                                                       name,
+                                                       NSStringFromCGPoint(location),
+                                                       NSStringFromCGRect(window.bounds)];
+
+    GREYPopulateErrorOrLog(errorOrNil,
+                           kGREYInteractionErrorDomain,
+                           kGREYInteractionActionFailedErrorCode,
+                           description);
+
     return NO;
   }
   return YES;

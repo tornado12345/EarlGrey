@@ -16,6 +16,8 @@
 
 #import "FTRBaseIntegrationTest.h"
 
+#import <EarlGrey/EarlGrey.h>
+
 @interface FTRAlertViewTest : FTRBaseIntegrationTest
 @end
 
@@ -43,6 +45,8 @@
       performAction:[GREYActions actionForTap]];
   [[EarlGrey selectElementWithMatcher:grey_text(@"Roger")]
       performAction:[GREYActions actionForTap]];
+  [[EarlGrey selectElementWithMatcher:grey_text(@"Multi-Option Alert")]
+      assertWithMatcher:grey_sufficientlyVisible()];
 }
 
 - (void)testAlertViewChain {
@@ -52,10 +56,11 @@
       performAction:[GREYActions actionForTap]];
   [[EarlGrey selectElementWithMatcher:grey_text(@"Roger")]
       performAction:[GREYActions actionForTap]];
+  [[EarlGrey selectElementWithMatcher:grey_text(@"Multi-Option Alert")]
+      assertWithMatcher:grey_sufficientlyVisible()];
 }
 
-//TODO: Investigate this flaky test.
-- (void)DISABLED_testStyledAlertView {
+- (void)testStyledAlertView {
   [[EarlGrey selectElementWithMatcher:grey_text(@"Styled Alert")]
       performAction:[GREYActions actionForTap]];
 

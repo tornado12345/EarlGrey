@@ -14,13 +14,13 @@
 // limitations under the License.
 //
 
-#import <EarlGrey/GREYAssertions.h>
-
-#import <EarlGrey/GREYAssertion.h>
-#import <EarlGrey/GREYElementFinder.h>
-#import <EarlGrey/GREYMatchers.h>
 #import <OCMock.h>
 
+#import <EarlGrey/GREYAssertion.h>
+#import "Assertion/GREYAssertions+Internal.h"
+#import <EarlGrey/GREYAssertions.h>
+#import <EarlGrey/GREYElementFinder.h>
+#import <EarlGrey/GREYMatchers.h>
 #import "GREYBaseTest.h"
 
 static NSMutableArray *gAppWindows;
@@ -36,11 +36,10 @@ static NSMutableArray *gAppWindows;
   [[[self.mockSharedApplication stub] andReturn:gAppWindows] windows];
 }
 
-- (void)testViewHasTextWithNilParameter {
+- (void)testViewHasTextWithEmptyString {
   UIView *view = [[UIView alloc] init];
   NSError *error;
-
-  [[GREYAssertions grey_createAssertionWithMatcher:grey_text(nil)] assert:view error:&error];
+  [[GREYAssertions grey_createAssertionWithMatcher:grey_text(@"")] assert:view error:&error];
   XCTAssertEqualObjects(error.domain, kGREYInteractionErrorDomain);
   XCTAssertEqual(error.code, kGREYInteractionAssertionFailedErrorCode);
 }
@@ -281,27 +280,13 @@ static NSMutableArray *gAppWindows;
   XCTAssertNil(error);
 }
 
-- (void)testNilMatcherWithNil {
-  NSError *error;
-
-  XCTAssertThrows([[GREYAssertions grey_createAssertionWithMatcher:nil] assert:nil error:&error]);
-  XCTAssertNil(error);
-}
-
-- (void)testNilMatcherWithView {
-  UIView *view = [[UIView alloc] init];
-  NSError *error;
-
-  XCTAssertThrows([[GREYAssertions grey_createAssertionWithMatcher:nil] assert:view error:&error]);
-  XCTAssertNil(error);
-}
-
 - (void)testAllOfMatcherWithNil {
   UIView *view = [[UIView alloc] init];
   NSError *error;
 
   id<GREYAssertion> assertion =
-      [GREYAssertions grey_createAssertionWithMatcher:grey_allOf(grey_equalTo(view), nil)];
+      [GREYAssertions grey_createAssertionWithMatcher:grey_allOf(grey_equalTo(view), grey_notNil(),
+                                                                 nil)];
   [assertion assert:nil error:&error];
   XCTAssertEqualObjects(error.domain, kGREYInteractionErrorDomain);
   XCTAssertEqual(error.code, kGREYInteractionElementNotFoundErrorCode);
@@ -309,7 +294,7 @@ static NSMutableArray *gAppWindows;
 
 - (void)testAllOfMatcherWithView {
   UIView *view = [[UIView alloc] init];
-  id<GREYMatcher> allOfMatcher = grey_allOf(grey_equalTo(view), nil);
+  id<GREYMatcher> allOfMatcher = grey_allOf(grey_equalTo(view), grey_notNil(), nil);
   NSError *error;
 
   [[GREYAssertions grey_createAssertionWithMatcher:allOfMatcher] assert:view error:&error];

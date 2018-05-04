@@ -14,11 +14,11 @@
 // limitations under the License.
 //
 
-#import <EarlGrey/GREYAppStateTracker.h>
-#import <EarlGrey/GREYPrivate.h>
-#import <EarlGrey/GREYUIWebViewDelegate.h>
-
 #import "FTRBaseIntegrationTest.h"
+#import "Delegate/GREYUIWebViewDelegate.h"
+#import <EarlGrey/EarlGrey.h>
+#import "Synchronization/GREYAppStateTracker.h"
+#import "Synchronization/GREYAppStateTrackerObject.h"
 
 /**
  *  A constant to wait for the locally loaded HTML page.
@@ -29,11 +29,12 @@ static const NSTimeInterval kLocalHTMLPageLoadDelay = 10.0;
  *  Required for testing UIWebView states.
  */
 @interface GREYAppStateTracker (FTRExposedForTesting)
-- (GREYAppState)grey_lastKnownStateForElement:(id)element;
+- (GREYAppState)grey_lastKnownStateForObject:(id)object;
 @end
 
 @interface UIWebView (FTRExposedForTesting)
 - (void)grey_trackAJAXLoading;
+- (GREYAppStateTrackerObject *)trackerObjectForWebView;
 @end
 
 @interface FTRUIWebViewTest : FTRBaseIntegrationTest<UIWebViewDelegate>
@@ -66,23 +67,33 @@ static const NSTimeInterval kLocalHTMLPageLoadDelay = 10.0;
   [self ftr_verifyLongTableOnLocallyLoadedRichHTML:NO];
 }
 
-- (void)testScrollingOnLocallyLoadedHTMLPagesWithBounce {
+// TODO: Temporarily disable the test due to the flakiness.
+// Link: https://github.com/google/EarlGrey/issues/181
+- (void)DISABLED_testScrollingOnLocallyLoadedHTMLPagesWithBounce {
   [self ftr_verifyScrollingOnLocallyLoadedHTMLPagesWithBounce:YES];
 }
 
-- (void)testScrollingOnLocallyLoadedHTMLPagesWithoutBounce {
+// TODO: Temporarily disable the test due to the flakiness.
+// Link: https://github.com/google/EarlGrey/issues/181
+- (void)DISABLED_testScrollingOnLocallyLoadedHTMLPagesWithoutBounce {
   [self ftr_verifyScrollingOnLocallyLoadedHTMLPagesWithBounce:NO];
 }
 
-- (void)testScrollingOnPagesLoadedUsingLoadHTMLStringWithBounce {
+// TODO: Temporarily disable the test due to the flakiness.
+// Link: https://github.com/google/EarlGrey/issues/181
+- (void)DISABLED_testScrollingOnPagesLoadedUsingLoadHTMLStringWithBounce {
   [self ftr_verifyScrollingOnPagesLoadedUsingLoadHTMLStringWithBounce:YES];
 }
 
-- (void)testScrollingOnPagesLoadedUsingLoadHTMLStringWithoutBounce {
+// TODO: Temporarily disable the test due to the flakiness.
+// Link: https://github.com/google/EarlGrey/issues/181
+- (void)DISABLED_testScrollingOnPagesLoadedUsingLoadHTMLStringWithoutBounce {
   [self ftr_verifyScrollingOnPagesLoadedUsingLoadHTMLStringWithBounce:NO];
 }
 
-- (void)testSynchronizationWhenSwitchingBetweenLoadingMethods {
+// TODO: Temporarily disable the test due to the flakiness.
+// Link: https://github.com/google/EarlGrey/issues/181
+- (void)DISABLED_testSynchronizationWhenSwitchingBetweenLoadingMethods {
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"loadLocalFile")]
       performAction:grey_tap()];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Row 1")]
@@ -104,25 +115,25 @@ static const NSTimeInterval kLocalHTMLPageLoadDelay = 10.0;
 - (void)testDelegateIsProxyDelegate {
   UIWebView *webView = [[UIWebView alloc] init];
   GREYUIWebViewDelegate *delegate = [webView delegate];
-  GREYAssertTrue([delegate isKindOfClass:[GREYUIWebViewDelegate class]], @"%@", [delegate class]);
+  XCTAssertTrue([delegate isKindOfClass:[GREYUIWebViewDelegate class]], @"%@", [delegate class]);
 }
 
 - (void)testDelegateIsProxyDelegateAfterSettingCustomDelegate {
   UIWebView *webView = [[UIWebView alloc] init];
   webView.delegate = self;
   GREYUIWebViewDelegate *delegate = [webView delegate];
-  GREYAssertTrue([delegate isKindOfClass:[GREYUIWebViewDelegate class]], @"%@", [delegate class]);
+  XCTAssertTrue([delegate isKindOfClass:[GREYUIWebViewDelegate class]], @"%@", [delegate class]);
 
   webView.delegate = self;
   delegate = [webView delegate];
-  GREYAssertTrue([delegate isKindOfClass:[GREYUIWebViewDelegate class]], @"%@", [delegate class]);
+  XCTAssertTrue([delegate isKindOfClass:[GREYUIWebViewDelegate class]], @"%@", [delegate class]);
 }
 
 - (void)testDelegateIsNotNilAfterClearingDelegate {
   UIWebView *webView = [[UIWebView alloc] init];
   webView.delegate = nil;
   GREYUIWebViewDelegate *delegate = [webView delegate];
-  GREYAssertTrue([delegate isKindOfClass:[GREYUIWebViewDelegate class]], @"%@", [delegate class]);
+  XCTAssertTrue([delegate isKindOfClass:[GREYUIWebViewDelegate class]], @"%@", [delegate class]);
 }
 
 - (void)testDelegateIsNotDeallocAfterClearingDelegate {
@@ -130,21 +141,21 @@ static const NSTimeInterval kLocalHTMLPageLoadDelay = 10.0;
   __weak GREYUIWebViewDelegate *delegate;
   {
     delegate = [webView delegate];
-    GREYAssertTrue([delegate isKindOfClass:[GREYUIWebViewDelegate class]], @"%@", [delegate class]);
+    XCTAssertTrue([delegate isKindOfClass:[GREYUIWebViewDelegate class]], @"%@", [delegate class]);
     [webView setDelegate:nil];
   }
 
   __weak GREYUIWebViewDelegate *secondDelegate;
   {
     secondDelegate = [webView delegate];
-    GREYAssertTrue([secondDelegate isKindOfClass:[GREYUIWebViewDelegate class]],
-                   @"%@", [delegate class]);
+    XCTAssertTrue([secondDelegate isKindOfClass:[GREYUIWebViewDelegate class]],
+                  @"%@", [delegate class]);
     [webView setDelegate:nil];
   }
 
-  GREYAssertNotNil(delegate, @"should not be nil");
-  GREYAssertNotNil(secondDelegate, @"should not be nil");
-  GREYAssertNotEqualObjects(delegate, secondDelegate, @"should not be equal");
+  XCTAssertNotNil(delegate, @"should not be nil");
+  XCTAssertNotNil(secondDelegate, @"should not be nil");
+  XCTAssertNotEqualObjects(delegate, secondDelegate, @"should not be equal");
 }
 
 - (void)testWebViewDeallocClearsAllDelegates {
@@ -162,12 +173,12 @@ static const NSTimeInterval kLocalHTMLPageLoadDelay = 10.0;
       secondDelegate = [webView delegate];
       [webView setDelegate:nil];
     }
-    GREYAssertTrue([delegate isKindOfClass:[GREYUIWebViewDelegate class]], @"%@", [delegate class]);
-    GREYAssertTrue([secondDelegate isKindOfClass:[GREYUIWebViewDelegate class]],
+    XCTAssertTrue([delegate isKindOfClass:[GREYUIWebViewDelegate class]], @"%@", [delegate class]);
+    XCTAssertTrue([secondDelegate isKindOfClass:[GREYUIWebViewDelegate class]],
                    @"%@", [delegate class]);
   }
-  GREYAssertNil(delegate, @"should be nil");
-  GREYAssertNil(secondDelegate, @"should be nil");
+  XCTAssertNil(delegate, @"should be nil");
+  XCTAssertNil(secondDelegate, @"should be nil");
 }
 
 - (void)testWebViewProxyDelegateClearsOutDeallocedDelegates {
@@ -178,7 +189,7 @@ static const NSTimeInterval kLocalHTMLPageLoadDelay = 10.0;
     __autoreleasing id<UIWebViewDelegate> autoRelDelegate = [[FTRUIWebViewTest alloc] init];
     [webView setDelegate:autoRelDelegate];
     delegate = [webView delegate];
-    GREYAssertTrue([delegate isKindOfClass:[GREYUIWebViewDelegate class]], @"%@", [delegate class]);
+    XCTAssertTrue([delegate isKindOfClass:[GREYUIWebViewDelegate class]], @"%@", [delegate class]);
   }
 
   // Should not crash.
@@ -189,14 +200,14 @@ static const NSTimeInterval kLocalHTMLPageLoadDelay = 10.0;
   UIWebView *webView = [[UIWebView alloc] init];
   [webView grey_trackAJAXLoading];
   GREYAppState lastState =
-      [[GREYAppStateTracker sharedInstance] grey_lastKnownStateForElement:webView];
+      [[GREYAppStateTracker sharedInstance] grey_lastKnownStateForObject:webView];
   BOOL isAsyncRequestPending = ((lastState & kGREYPendingUIWebViewAsyncRequest) != 0);
-  GREYAssertTrue(isAsyncRequestPending, @"should be pending");
+  XCTAssertTrue(isAsyncRequestPending, @"should be pending");
 
   [webView stopLoading];
-  lastState = [[GREYAppStateTracker sharedInstance] grey_lastKnownStateForElement:webView];
+  lastState = [[GREYAppStateTracker sharedInstance] grey_lastKnownStateForObject:webView];
   isAsyncRequestPending = ((lastState & kGREYPendingUIWebViewAsyncRequest) != 0);
-  GREYAssertFalse(isAsyncRequestPending, @"should not be pending");
+  XCTAssertFalse(isAsyncRequestPending, @"should not be pending");
 }
 
 - (void)testAjaxTrackedWhenAJAXListenerSchemeIsStarting {
@@ -208,9 +219,9 @@ static const NSTimeInterval kLocalHTMLPageLoadDelay = 10.0;
       shouldStartLoadWithRequest:req
                   navigationType:UIWebViewNavigationTypeOther];
   GREYAppState lastState =
-      [[GREYAppStateTracker sharedInstance] grey_lastKnownStateForElement:webView];
+      [[GREYAppStateTracker sharedInstance] grey_lastKnownStateForObject:webView];
   BOOL isAsyncRequestPending = ((lastState & kGREYPendingUIWebViewAsyncRequest) != 0);
-  GREYAssertTrue(isAsyncRequestPending, @"should be pending");
+  XCTAssertTrue(isAsyncRequestPending, @"should be pending");
 }
 
 - (void)testAjaxUnTrackedWhenAJAXListenerSchemeIsCompleted {
@@ -218,9 +229,9 @@ static const NSTimeInterval kLocalHTMLPageLoadDelay = 10.0;
   [webView grey_trackAJAXLoading];
 
   GREYAppState lastState =
-      [[GREYAppStateTracker sharedInstance] grey_lastKnownStateForElement:webView];
+      [[GREYAppStateTracker sharedInstance] grey_lastKnownStateForObject:webView];
   BOOL isAsyncRequestPending = ((lastState & kGREYPendingUIWebViewAsyncRequest) != 0);
-  GREYAssertTrue(isAsyncRequestPending, @"should be pending");
+  XCTAssertTrue(isAsyncRequestPending, @"should be pending");
 
   NSURLRequest *req =
       [NSURLRequest requestWithURL:[NSURL URLWithString:@"greyajaxlistener://completed"]];
@@ -228,9 +239,29 @@ static const NSTimeInterval kLocalHTMLPageLoadDelay = 10.0;
   [[webView delegate] webView:webView
       shouldStartLoadWithRequest:req
                   navigationType:UIWebViewNavigationTypeOther];
-  lastState = [[GREYAppStateTracker sharedInstance] grey_lastKnownStateForElement:webView];
+  lastState = [[GREYAppStateTracker sharedInstance] grey_lastKnownStateForObject:webView];
   isAsyncRequestPending = ((lastState & kGREYPendingUIWebViewAsyncRequest) != 0);
-  GREYAssertFalse(isAsyncRequestPending, @"should not be pending");
+  XCTAssertFalse(isAsyncRequestPending, @"should not be pending");
+}
+
+// TODO: Temporarily disable the test due to that it fails to dectect the UIWebView is idling.
+// Link: https://github.com/google/EarlGrey/issues/365
+- (void)DISABLED_testLongPressLinkInUIWebView {
+  // Load local page first.
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"loadLocalFile")]
+      performAction:grey_tap()];
+
+  // Wait for the local page to load.
+  [self ftr_waitForElementWithAccessibilityLabelToAppear:@"Row 1"];
+
+  // Long press on the next test link.
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Link to Next Test")]
+      performAction:grey_longPress()];
+
+  // Click on 'Open' button to validate the popup
+  id<GREYMatcher> openLabelMatcher = grey_allOf(grey_accessibilityTrait(UIAccessibilityTraitButton),
+                                                grey_accessibilityLabel(@"Open"), nil);
+  [[EarlGrey selectElementWithMatcher:openLabelMatcher] performAction:grey_tap()];
 }
 
 #pragma mark - Private

@@ -16,9 +16,13 @@
 
 #import "Assertion/GREYAssertions.h"
 
+#import "Additions/NSObject+GREYAdditions.h"
 #import "Assertion/GREYAssertion.h"
 #import "Assertion/GREYAssertionBlock.h"
 #import "Assertion/GREYAssertionDefines.h"
+#import "Common/GREYError.h"
+#import "Common/GREYFatalAsserts.h"
+#import "Common/GREYLogger.h"
 #import "Core/GREYInteraction.h"
 #import "Matcher/GREYMatcher.h"
 #import "Matcher/GREYMatchers.h"
@@ -26,37 +30,49 @@
 
 @implementation GREYAssertions
 
-#pragma mark - Private
+#pragma mark - Package Internal
+
++ (void)grey_raiseExceptionNamed:(NSString *)name
+                exceptionDetails:(NSString *)details
+                       withError:(GREYError *)error {
+  id<GREYFailureHandler> failureHandler = grey_getFailureHandler();
+  NSString *reason = [GREYError grey_nestedDescriptionForError:error];
+  [failureHandler handleException:[GREYFrameworkException exceptionWithName:name
+                                                                     reason:reason]
+                          details:details];
+}
 
 + (id<GREYAssertion>)grey_createAssertionWithMatcher:(id<GREYMatcher>)matcher {
-  NSParameterAssert(matcher);
+  GREYFatalAssert(matcher);
 
-  NSString *assertionName = [NSString stringWithFormat:@"assertWithMatcher: %@", matcher];
+  NSString *assertionName = [NSString stringWithFormat:@"assertWithMatcher:%@", matcher];
   return [GREYAssertionBlock assertionWithName:assertionName
                        assertionBlockWithError:^BOOL (id element, NSError *__strong *errorOrNil) {
     GREYStringDescription *mismatch = [[GREYStringDescription alloc] init];
     if (![matcher matches:element describingMismatchTo:mismatch]) {
       NSMutableString *reason = [[NSMutableString alloc] init];
+      NSMutableDictionary *glossary = [[NSMutableDictionary alloc] init];
       if (!element) {
-        [reason appendFormat:@"Assertion with matcher '%@' failed: no UI element was matched.",
-                             matcher];
-        if (errorOrNil) {
-          *errorOrNil = [NSError errorWithDomain:kGREYInteractionErrorDomain
-                                            code:kGREYInteractionElementNotFoundErrorCode
-                                        userInfo:@{ NSLocalizedDescriptionKey : reason }];
-        }
+        [reason appendFormat:@"Assertion with matcher [M] failed: No UI element was matched."];
+        glossary[@"M"] = [matcher description];
+
+        GREYPopulateErrorNotedOrLog(errorOrNil,
+                                    kGREYInteractionErrorDomain,
+                                    kGREYInteractionElementNotFoundErrorCode,
+                                    reason,
+                                    glossary);
       } else {
-        [reason appendFormat:@"Assertion with matcher '%@' failed: UI element '%@' failed to match "
-                             @"%@", matcher, element, mismatch];
-        if (errorOrNil) {
-          *errorOrNil = [NSError errorWithDomain:kGREYInteractionErrorDomain
-                                            code:kGREYInteractionAssertionFailedErrorCode
-                                        userInfo:@{ NSLocalizedDescriptionKey : reason }];
-        }
-      }
-      // Log error if we are not populating errorOrNil.
-      if (!errorOrNil) {
-        NSLog(@"%@", reason);
+        [reason appendFormat:@"Assertion with matcher [M] failed: UI element [E] failed to match "
+                             @"the following matcher(s): [S]"];
+        glossary[@"M"] = [matcher description];
+        glossary[@"E"] = [element grey_description];
+        glossary[@"S"] = [mismatch description];
+
+        GREYPopulateErrorNotedOrLog(errorOrNil,
+                                    kGREYInteractionErrorDomain,
+                                    kGREYInteractionAssertionFailedErrorCode,
+                                    reason,
+                                    glossary);
       }
       return NO;
     }

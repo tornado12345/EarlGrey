@@ -17,8 +17,9 @@
 #import "Delegate/GREYUIWebViewDelegate.h"
 
 #import "Additions/UIWebView+GREYAdditions.h"
-#import "Common/GREYPrivate.h"
+
 #import "Synchronization/GREYAppStateTracker.h"
+#import "Synchronization/GREYUIThreadExecutor+Internal.h"
 #import "Synchronization/GREYUIWebViewIdlingResource.h"
 
 static NSString *const kAjaxListenerScheme = @"greyajaxlistener";

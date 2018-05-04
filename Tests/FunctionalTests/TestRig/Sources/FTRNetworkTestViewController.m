@@ -15,7 +15,6 @@
 //
 
 #import "FTRNetworkTestViewController.h"
-
 #import "FTRNetworkProxy.h"
 
 /**
@@ -28,18 +27,15 @@ static NSString *const kFTRTestProxyData = @"kFTRTestProxyData";
  */
 static NSString *const kFTRProxyRegex = @"^http://www.youtube.com";
 
-@interface FTRNetworkTestViewController ()<NSURLConnectionDelegate, NSURLConnectionDataDelegate>
+@interface FTRNetworkTestViewController () <NSURLConnectionDelegate,
+                                            NSURLConnectionDataDelegate,
+                                            NSURLSessionDataDelegate>
 @property(weak, nonatomic) IBOutlet UILabel *retryIndicator;
 @property(weak, nonatomic) IBOutlet UILabel *responseVerifiedLabel;
 @property(weak, nonatomic) IBOutlet UILabel *requestCompletedLabel;
 @end
 
 @implementation FTRNetworkTestViewController
-
-- (instancetype)init {
-  NSAssert(NO, @"Invalid Initializer");
-  return nil;
-}
 
 - (void)viewWillAppear:(BOOL)animated {
   [FTRNetworkProxy ftr_setProxyEnabled:YES];
@@ -48,8 +44,8 @@ static NSString *const kFTRProxyRegex = @"^http://www.youtube.com";
   [super viewWillAppear:animated];
 }
 
-- (void)viewWillDisappear:(BOOL)animated {
-  [super viewWillDisappear:animated];
+- (void)viewDidDisappear:(BOOL)animated {
+  [super viewDidDisappear:animated];
   [FTRNetworkProxy ftr_removeMostRecentProxyRuleMatchingUrlRegexString:kFTRProxyRegex];
   [FTRNetworkProxy ftr_setProxyEnabled:NO];
 }
@@ -66,20 +62,43 @@ static NSString *const kFTRProxyRegex = @"^http://www.youtube.com";
   // instead.
   NSString *dataStr = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
   if ([kFTRTestProxyData isEqualToString:dataStr]) {
-    self.responseVerifiedLabel.hidden = NO;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      self.responseVerifiedLabel.hidden = NO;
+    });
   }
 }
 
 - (IBAction)testNetworkClick:(id)sender {
   NSURLRequest *request =
       [NSURLRequest requestWithURL:[NSURL URLWithString:@"http://www.youtube.com/"]];
-  [[[NSURLSession sharedSession] dataTaskWithRequest:request
-                                   completionHandler:^(NSData *data,
-                                                       NSURLResponse *response,
-                                                       NSError *error) {
-                                     _requestCompletedLabel.hidden = NO;
-                                     [self verifyReceivedData:data];
-                                   }] resume];
+  [NSURLConnection connectionWithRequest:request delegate:self];
+}
+
+- (IBAction)userDidTapNSURLSessionDelegateTest:(id)sender {
+  NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
+  config.protocolClasses =
+      [@[[FTRNetworkProxy class]] arrayByAddingObjectsFromArray:config.protocolClasses];
+  NSURLSession *session =
+      [NSURLSession sessionWithConfiguration:config
+                                    delegate:self
+                               delegateQueue:nil];
+  NSURLSessionTask *task =
+      [session dataTaskWithURL:[NSURL URLWithString:@"http://www.youtube.com/"]];
+  // Begin the fetch.
+  [task resume];
+}
+
+- (IBAction)userDidTapNSURLSessionNoCallbackTest:(id)sender {
+  NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
+  config.protocolClasses =
+      [@[[FTRNetworkProxy class]] arrayByAddingObjectsFromArray:config.protocolClasses];
+  NSURLSession *session = [NSURLSession sessionWithConfiguration:config
+                                                        delegate:nil
+                                                   delegateQueue:nil];
+  NSURLSessionTask *task =
+      [session dataTaskWithURL:[NSURL URLWithString:@"http://www.youtube.com/"]];
+  // Begin the fetch.
+  [task resume];
 }
 
 - (IBAction)userDidTapNSURLSessionTest:(id)sender {
@@ -87,11 +106,42 @@ static NSString *const kFTRProxyRegex = @"^http://www.youtube.com";
   NSURLSessionTask *task =
       [session dataTaskWithURL:[NSURL URLWithString:@"http://www.youtube.com/"]
              completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-    [self verifyReceivedData:data];
-    _requestCompletedLabel.hidden = NO;
-  }];
+               [NSThread sleepForTimeInterval:1.0];
+               [self verifyReceivedData:data];
+               dispatch_async(dispatch_get_main_queue(), ^{
+                 _requestCompletedLabel.hidden = NO;
+               });
+             }];
   // Begin the fetch.
   [task resume];
+}
+
+#pragma mark - NSURLSessionDataDelegate
+
+- (void)URLSession:(NSURLSession *)session
+          dataTask:(NSURLSessionDataTask *)dataTask
+    didReceiveData:(NSData *)data {
+  // Simulate some processing time to reliably test network synchronization. Without this network
+  // synchronization tests will be flaky.
+  [NSThread sleepForTimeInterval:1.0];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    _requestCompletedLabel.hidden = NO;
+  });
+  [self verifyReceivedData:data];
+}
+
+#pragma mark - NSURLConnectionDelegate
+
+- (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data {
+  [self verifyReceivedData:data];
+}
+
+- (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error {
+  _requestCompletedLabel.hidden = NO;
+}
+
+- (void)connectionDidFinishLoading:(NSURLConnection *)connection {
+  _requestCompletedLabel.hidden = NO;
 }
 
 @end

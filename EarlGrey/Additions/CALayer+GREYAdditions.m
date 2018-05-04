@@ -21,9 +21,11 @@
 #import "Additions/CAAnimation+GREYAdditions.h"
 #import "Additions/NSObject+GREYAdditions.h"
 #import "Common/GREYConfiguration.h"
+#import "Common/GREYFatalAsserts.h"
+#import "Common/GREYLogger.h"
 #import "Common/GREYSwizzler.h"
-#import "Common/GREYVerboseLogger.h"
 #import "Synchronization/GREYAppStateTracker.h"
+#import "Synchronization/GREYAppStateTrackerObject.h"
 
 @implementation CALayer (GREYAdditions)
 
@@ -33,37 +35,37 @@
     BOOL swizzleSuccess = [swizzler swizzleClass:self
                            replaceInstanceMethod:@selector(setNeedsDisplay)
                                       withMethod:@selector(greyswizzled_setNeedsDisplay)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle CALayer setNeedsDisplay");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle CALayer setNeedsDisplay");
 
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(setNeedsDisplayInRect:)
                                  withMethod:@selector(greyswizzled_setNeedsDisplayInRect:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle CALayer setNeedsDisplayInRect");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle CALayer setNeedsDisplayInRect");
 
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(setNeedsLayout)
                                  withMethod:@selector(greyswizzled_setNeedsLayout)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle CALayer setNeedsLayout");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle CALayer setNeedsLayout");
 
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(addAnimation:forKey:)
                                  withMethod:@selector(greyswizzled_addAnimation:forKey:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle CALayer addAnimation:forKey:");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle CALayer addAnimation:forKey:");
 
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(setSpeed:)
                                  withMethod:@selector(greyswizzled_setSpeed:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle CALayer setSpeed:");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle CALayer setSpeed:");
 
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(removeAnimationForKey:)
                                  withMethod:@selector(greyswizzled_removeAnimationForKey:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle CALayer removeAnimationForKey:");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle CALayer removeAnimationForKey:");
 
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(removeAllAnimations)
                                  withMethod:@selector(greyswizzled_removeAllAnimations)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle CALayer removeAllAnimations");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle CALayer removeAllAnimations");
   }
 }
 
@@ -174,9 +176,9 @@
   }
   // At this point, the app could be in idle state and the next runloop drain may trigger this
   // animation so track this LAYER (not animation) until next runloop drain.
-  NSString *elementID = TRACK_STATE_FOR_ELEMENT(kGREYPendingCAAnimation, self);
+  GREYAppStateTrackerObject *object = TRACK_STATE_FOR_OBJECT(kGREYPendingCAAnimation, self);
   dispatch_async(dispatch_get_main_queue(), ^{
-    UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYPendingCAAnimation, elementID);
+    UNTRACK_STATE_FOR_OBJECT(kGREYPendingCAAnimation, object);
   });
   INVOKE_ORIGINAL_IMP2(void, @selector(greyswizzled_addAnimation:forKey:), animation, outKey);
 }
@@ -191,28 +193,28 @@
 }
 
 - (void)greyswizzled_setNeedsDisplayInRect:(CGRect)invalidRect {
-  NSString *elementID = TRACK_STATE_FOR_ELEMENT(kGREYPendingDrawLayoutPass, self);
+  GREYAppStateTrackerObject *object = TRACK_STATE_FOR_OBJECT(kGREYPendingDrawLayoutPass, self);
   // Next runloop drain will perform the draw pass.
   dispatch_async(dispatch_get_main_queue(), ^{
-    UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYPendingDrawLayoutPass, elementID);
+    UNTRACK_STATE_FOR_OBJECT(kGREYPendingDrawLayoutPass, object);
   });
   INVOKE_ORIGINAL_IMP1(void, @selector(greyswizzled_setNeedsDisplayInRect:), invalidRect);
 }
 
 - (void)greyswizzled_setNeedsDisplay {
-  NSString *elementID = TRACK_STATE_FOR_ELEMENT(kGREYPendingDrawLayoutPass, self);
+  GREYAppStateTrackerObject *object = TRACK_STATE_FOR_OBJECT(kGREYPendingDrawLayoutPass, self);
   // Next runloop drain will perform the draw pass.
   dispatch_async(dispatch_get_main_queue(), ^{
-    UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYPendingDrawLayoutPass, elementID);
+    UNTRACK_STATE_FOR_OBJECT(kGREYPendingDrawLayoutPass, object);
   });
   INVOKE_ORIGINAL_IMP(void, @selector(greyswizzled_setNeedsDisplay));
 }
 
 - (void)greyswizzled_setNeedsLayout {
-  NSString *elementID = TRACK_STATE_FOR_ELEMENT(kGREYPendingDrawLayoutPass, self);
+  GREYAppStateTrackerObject *object = TRACK_STATE_FOR_OBJECT(kGREYPendingDrawLayoutPass, self);
   // Next runloop drain will perform the layout pass.
   dispatch_async(dispatch_get_main_queue(), ^ {
-    UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYPendingDrawLayoutPass, elementID);
+    UNTRACK_STATE_FOR_OBJECT(kGREYPendingDrawLayoutPass, object);
   });
   INVOKE_ORIGINAL_IMP(void, @selector(greyswizzled_setNeedsLayout));
 }

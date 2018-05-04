@@ -21,15 +21,12 @@
 
 @implementation FTRBasicViewController
 
-- (instancetype)init {
-  NSAssert(NO, @"Invalid Initializer");
-  return nil;
-}
-
 - (void)viewDidLoad {
   [super viewDidLoad];
 
   self.sampleLabel.accessibilityIdentifier = @"sampleLabel";
+
+  self.disabledButton.enabled = NO;
 
   self.textField.delegate = self;
   self.textField.accessibilityIdentifier = @"foo";
@@ -73,7 +70,7 @@
 }
 
 - (void)moveDoubleTapOffScreen {
-  self.doubleTapLabel.frame = CGRectMake(-20, -20, 10, 10);
+  self.doubleTapLabel.hidden = YES;
 }
 
 - (void)tabChange:(id)sender {

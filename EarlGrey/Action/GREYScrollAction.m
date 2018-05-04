@@ -24,6 +24,9 @@
 #import "Additions/NSString+GREYAdditions.h"
 #import "Additions/UIScrollView+GREYAdditions.h"
 #import "Assertion/GREYAssertionDefines.h"
+#import "Common/GREYError.h"
+#import "Common/GREYFatalAsserts.h"
+#import "Common/GREYThrowDefines.h"
 #import "Event/GREYSyntheticEvents.h"
 #import "Matcher/GREYAllOf.h"
 #import "Matcher/GREYAnyOf.h"
@@ -58,11 +61,16 @@ static const NSInteger kMinTouchPointsToDetectScrollResistance = 2;
 - (instancetype)initWithDirection:(GREYDirection)direction
                            amount:(CGFloat)amount
                startPointPercents:(CGPoint)startPointPercents {
-  NSAssert(amount > 0, @"Scroll 'amount' must be positive and greater than zero.");
-  NSAssert(isnan(startPointPercents.x) || (startPointPercents.x > 0 && startPointPercents.x < 1),
-           @"startPointPercents must be NAN or in the range (0, 1) exclusive");
-  NSAssert(isnan(startPointPercents.y) || (startPointPercents.y > 0 && startPointPercents.y < 1),
-           @"startPointPercents must be NAN or in the range (0, 1) exclusive");
+  GREYThrowOnFailedConditionWithMessage(amount > 0,
+                                        @"Scroll amount must be positive and greater than zero.");
+  GREYThrowOnFailedConditionWithMessage(isnan(startPointPercents.x) ||
+                                        (startPointPercents.x > 0 && startPointPercents.x < 1),
+                                        @"startPointPercents must be NAN or in the range (0, 1) "
+                                        @"exclusive");
+  GREYThrowOnFailedConditionWithMessage(isnan(startPointPercents.y) ||
+                                        (startPointPercents.y > 0 && startPointPercents.y < 1),
+                                        @"startPointPercents must be NAN or in the range (0, 1) "
+                                        @"exclusive");
 
   NSString *name =
       [NSString stringWithFormat:@"Scroll %@ for %g", NSStringFromGREYDirection(direction), amount];
@@ -100,29 +108,28 @@ static const NSInteger kMinTouchPointsToDetectScrollResistance = 2;
   while (amountRemaining > 0 && success) {
     @autoreleasepool {
       // To scroll the content view in a direction
-      NSArray *touchPath =
-          [GREYPathGestureUtils touchPathForGestureInView:element
-                   withDirection:[GREYConstants reverseOfDirection:_direction]
-                          length:amountRemaining
-              startPointPercents:_startPointPercents
-              outRemainingAmount:&amountRemaining];
+      GREYDirection reverseDirection = [GREYConstants reverseOfDirection:_direction];
+      NSArray *touchPath = [GREYPathGestureUtils touchPathForGestureInView:element
+                                                             withDirection:reverseDirection
+                                                                    length:amountRemaining
+                                                        startPointPercents:_startPointPercents
+                                                        outRemainingAmount:&amountRemaining];
       if (!touchPath) {
-        [NSError grey_logOrSetOutReferenceIfNonNil:errorOrNil
-                                        withDomain:kGREYScrollErrorDomain
-                                              code:kGREYScrollImpossible
-                              andDescriptionFormat:@"Cannot scroll, ensure that the selected scroll"
-                                                   @" view is wide enough to scroll."];
+        GREYPopulateErrorOrLog(errorOrNil,
+                               kGREYScrollErrorDomain,
+                               kGREYScrollImpossible,
+                               @"Cannot scroll, ensure that the selected scroll view "
+                               @"is wide enough to scroll.");
         return NO;
       }
       success = [GREYScrollAction grey_injectTouchPath:touchPath onScrollView:element];
     }
   }
   if (!success) {
-    [NSError grey_logOrSetOutReferenceIfNonNil:errorOrNil
-                                    withDomain:kGREYScrollErrorDomain
-                                          code:kGREYScrollReachedContentEdge
-                          andDescriptionFormat:@"Cannot scroll, the scrollview is already at"
-                                               @" the edge."];
+    GREYPopulateErrorOrLog(errorOrNil,
+                           kGREYScrollErrorDomain,
+                           kGREYScrollReachedContentEdge,
+                           @"Cannot scroll, the scrollview is already at the edge.");
   }
   return success;
 }
@@ -138,8 +145,8 @@ static const NSInteger kMinTouchPointsToDetectScrollResistance = 2;
  *  @return @c YES if entire touchPath was injected, else @c NO.
  */
 + (BOOL)grey_injectTouchPath:(NSArray *)touchPath onScrollView:(UIScrollView *)scrollView {
-  // We need at least one touch point to inject a touch path.
-  NSParameterAssert([touchPath count] >= 1);
+  GREYFatalAssert([touchPath count] >= 1);
+
   // In scrollviews that have their bounce turned off the horizontal and vertical velocities are not
   // reliable for detecting scroll resistance because they report non-zero velocities even when
   // content edge has been reached. So we are using contentOffsets as a workaround. But note that

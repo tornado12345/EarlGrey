@@ -19,28 +19,34 @@
 #import <UIKit/UIGestureRecognizerSubclass.h>
 #include <objc/runtime.h>
 
+#import "Common/GREYFatalAsserts.h"
 #import "Common/GREYSwizzler.h"
 #import "Synchronization/GREYAppStateTracker.h"
+#import "Synchronization/GREYAppStateTrackerObject.h"
+
+static Class gKeyboardPinchGestureRecognizerClass;
 
 @implementation UIGestureRecognizer (GREYAdditions)
 
 + (void)load {
   @autoreleasepool {
+    gKeyboardPinchGestureRecognizerClass = NSClassFromString(@"UIKeyboardPinchGestureRecognizer");
     GREYSwizzler *swizzler = [[GREYSwizzler alloc] init];
     BOOL swizzled = [swizzler swizzleClass:self
                      replaceInstanceMethod:NSSelectorFromString(@"_setDirty")
                                 withMethod:@selector(greyswizzled_setDirty)];
-    NSAssert(swizzled, @"Failed to swizzle UIGestureRecognizer _setDirty");
+    GREYFatalAssertWithMessage(swizzled, @"Failed to swizzle UIGestureRecognizer _setDirty");
 
     swizzled = [swizzler swizzleClass:self
                 replaceInstanceMethod:NSSelectorFromString(@"_resetGestureRecognizer")
                            withMethod:@selector(greyswizzled_resetGestureRecognizer)];
-    NSAssert(swizzled, @"Failed to swizzle UIGestureRecognizer _resetGestureRecognizer");
+    GREYFatalAssertWithMessage(swizzled,
+                               @"Failed to swizzle UIGestureRecognizer _resetGestureRecognizer");
 
     swizzled = [swizzler swizzleClass:self
                 replaceInstanceMethod:@selector(setState:)
                            withMethod:@selector(greyswizzled_setState:)];
-    NSAssert(swizzled, @"Failed to swizzle UIGestureRecognizer setState:");
+    GREYFatalAssertWithMessage(swizzled, @"Failed to swizzle UIGestureRecognizer setState:");
   }
 }
 
@@ -48,16 +54,21 @@
 
 - (void)greyswizzled_setDirty {
   INVOKE_ORIGINAL_IMP(void, @selector(greyswizzled_setDirty));
-  NSString *elementID = TRACK_STATE_FOR_ELEMENT(kGREYPendingGestureRecognition, self);
-  objc_setAssociatedObject(self,
-                           @selector(greyswizzled_setState:),
-                           elementID,
-                           OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+  if (UI_USER_INTERFACE_IDIOM() != UIUserInterfaceIdiomPad ||
+      ![self isKindOfClass:gKeyboardPinchGestureRecognizerClass]) {
+    GREYAppStateTrackerObject *object =
+    TRACK_STATE_FOR_OBJECT(kGREYPendingGestureRecognition, self);
+    objc_setAssociatedObject(self,
+                             @selector(greyswizzled_setState:),
+                             object,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+  }
 }
 
 - (void)greyswizzled_resetGestureRecognizer {
-  NSString *elementID = objc_getAssociatedObject(self, @selector(greyswizzled_setState:));
-  UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYPendingGestureRecognition, elementID);
+  GREYAppStateTrackerObject *object =
+      objc_getAssociatedObject(self, @selector(greyswizzled_setState:));
+  UNTRACK_STATE_FOR_OBJECT(kGREYPendingGestureRecognition, object);
   objc_setAssociatedObject(self,
                            @selector(greyswizzled_setState:),
                            nil,
@@ -69,8 +80,9 @@
   // This is needed only for a few cases where reset isn't called on the gesture recognizer when
   // keyboard is shown. We need to manually untrack when state is set to failed.
   if (state == UIGestureRecognizerStateFailed) {
-    NSString *elementID = objc_getAssociatedObject(self, @selector(greyswizzled_setState:));
-    UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYPendingGestureRecognition, elementID);
+    GREYAppStateTrackerObject *object =
+        objc_getAssociatedObject(self, @selector(greyswizzled_setState:));
+    UNTRACK_STATE_FOR_OBJECT(kGREYPendingGestureRecognition, object);
     objc_setAssociatedObject(self,
                              @selector(greyswizzled_setState:),
                              nil,

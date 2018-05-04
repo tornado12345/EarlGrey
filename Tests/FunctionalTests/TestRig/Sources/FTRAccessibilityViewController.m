@@ -16,5 +16,32 @@
 
 #import "FTRAccessibilityViewController.h"
 
+#import <MessageUI/MessageUI.h>
+
 @implementation FTRAccessibilityViewController
+
+- (IBAction)openMessageComposeView:(id)sender {
+  id mvc = nil;
+  if ([MFMessageComposeViewController canSendText]) {
+    mvc = [[MFMessageComposeViewController alloc] init];
+  } else if ([MFMailComposeViewController canSendMail]) {
+    mvc = [[MFMailComposeViewController alloc] init];
+  }
+  if (mvc) {
+    // On iOS 8.2, presentViewController for MFMailComposeViewController doesn't trigger proper
+    // state tracking calls which would render the app busy. The run loop spins but the view
+    // controller isn't shown leading to failure of next test statement which is expecting the said
+    // view controller to be present. This only happens for MFMailComposeViewController hence we
+    // add artificial synchronization by calling {begin,end}IgnoringInteractionEvents.
+    [[UIApplication sharedApplication] beginIgnoringInteractionEvents];
+    [self presentViewController:mvc animated:YES completion:^{
+      [[UIApplication sharedApplication] endIgnoringInteractionEvents];
+      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
+                     dispatch_get_main_queue(), ^{
+                       [self dismissViewControllerAnimated:NO completion:NULL];
+                     });
+    }];
+  }
+}
+
 @end

@@ -17,15 +17,19 @@
 //
 // Exposes methods, classes and globals for Unit Testing.
 //
-#import <EarlGrey/GREYAnalytics.h>
-#import <EarlGrey/GREYAppStateTracker.h>
 #import <EarlGrey/GREYElementHierarchy.h>
-#import <EarlGrey/GREYManagedObjectContextIdlingResource.h>
 #import <EarlGrey/GREYProvider.h>
-#import <EarlGrey/GREYTimedIdlingResource.h>
+#import <EarlGrey/GREYManagedObjectContextIdlingResource.h>
+#import "Synchronization/GREYTimedIdlingResource.h"
 #import <EarlGrey/GREYUIThreadExecutor.h>
-#import <EarlGrey/GREYVisibilityChecker.h>
-#import <EarlGrey/UIView+GREYAdditions.h>
+
+#import "Additions/UIView+GREYAdditions.h"
+#import "Common/GREYAnalytics.h"
+#import "Common/GREYVisibilityChecker.h"
+#import "Synchronization/GREYAppStateTracker.h"
+#import "Synchronization/GREYAppStateTrackerObject.h"
+#import "Traversal/GREYTraversal.h"
+#import "Traversal/GREYTraversalDFS.h"
 
 // Indicates the minimum scroll length required for any scroll to be detected, currently defined in
 // GREYPathGestureUtils.m.
@@ -40,7 +44,7 @@ extern const NSInteger kGREYScrollDetectionLength;
 @end
 
 @interface GREYAppStateTracker (GREYExposedForTesting)
-- (GREYAppState)grey_lastKnownStateForElement:(id)element;
+- (GREYAppState)grey_lastKnownStateForObject:(id)object;
 @end
 
 @interface GREYManagedObjectContextIdlingResource (GREYExposedForTesting)
@@ -63,18 +67,21 @@ extern const NSInteger kGREYScrollDetectionLength;
 @end
 
 @interface GREYVisibilityChecker (GREYExposedForTesting)
-+ (NSUInteger)grey_countPixelsInImage:(CGImageRef)afterImage
-           thatAreShiftedPixelsOfImage:(CGImageRef)beforeImage
-           storeVisiblePixelRectInRect:(CGRect *)outVisiblePixelRect
-      andStoreComparisonResultInBuffer:(GREYVisibilityDiffBuffer *)outDiffBufferOrNULL;
++ (GREYVisiblePixelData)grey_countPixelsInImage:(CGImageRef)afterImage
+                    thatAreShiftedPixelsOfImage:(CGImageRef)beforeImage
+                    storeVisiblePixelRectInRect:(CGRect *)outVisiblePixelRect
+               andStoreComparisonResultInBuffer:(GREYVisibilityDiffBuffer *)outDiffBufferOrNULL;
 @end
 
 @interface GREYElementHierarchy (GREYExposedForTesting)
 + (NSString *)grey_printDescriptionForElement:(id)element
                                     atLevel:(NSUInteger)level;
-+ (NSArray *)grey_orderedChildrenOf:(id)element;
-+ (NSString *) grey_recursivePrint:(id)element
-                       withLevel:(NSUInteger)level
-                    outputString:(NSMutableString *)outputString
-         andAnnotationDictionary:(NSDictionary *)annotationDictionary;
++ (NSString *)grey_hierarchyString:(id)element
+                      outputString:(NSMutableString *)outputString
+           andAnnotationDictionary:(NSDictionary *)annotationDictionary;
+@end
+
+@interface GREYTraversal (GREYExposedForTesting)
+- (instancetype)init;
+- (NSArray *)exploreImmediateChildren:(id)element;
 @end

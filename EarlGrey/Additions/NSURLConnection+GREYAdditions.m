@@ -21,9 +21,11 @@
 #import "Additions/NSObject+GREYAdditions.h"
 #import "Additions/NSURL+GREYAdditions.h"
 #import "Common/GREYConfiguration.h"
+#import "Common/GREYFatalAsserts.h"
 #import "Common/GREYSwizzler.h"
 #import "Delegate/GREYNSURLConnectionDelegate.h"
 #import "Synchronization/GREYAppStateTracker.h"
+#import "Synchronization/GREYAppStateTrackerObject.h"
 
 typedef void (^NSURLConnectionCompletionBlock)(NSURLResponse *, NSData *, NSError *);
 
@@ -37,72 +39,74 @@ typedef void (^NSURLConnectionCompletionBlock)(NSURLResponse *, NSData *, NSErro
     BOOL swizzleSuccess = [swizzler swizzleClass:self
                               replaceClassMethod:originalSelector
                                       withMethod:swizzledSelector];
-    NSAssert(swizzleSuccess,
-             @"Cannot swizzle NSURLConnection sendAsynchronousRequest:queue:completionHandler:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle NSURLConnection::"
+                               @"sendAsynchronousRequest:queue:completionHandler:");
 
     originalSelector = @selector(sendSynchronousRequest:returningResponse:error:);
     swizzledSelector = @selector(greyswizzled_sendSynchronousRequest:returningResponse:error:);
     swizzleSuccess = [swizzler swizzleClass:self
                          replaceClassMethod:originalSelector
                                  withMethod:swizzledSelector];
-    NSAssert(swizzleSuccess,
-             @"Cannot swizzle NSURLConnection sendSynchronousRequest:returningResponse:error:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle "
+                               @"NSURLConnection::sendSynchronousRequest:returningResponse:error:");
 
     originalSelector = @selector(connectionWithRequest:delegate:);
     swizzledSelector = @selector(greyswizzled_connectionWithRequest:delegate:);
     swizzleSuccess = [swizzler swizzleClass:self
                          replaceClassMethod:originalSelector
                                  withMethod:swizzledSelector];
-    NSAssert(swizzleSuccess, @"Cannot swizzle NSURLConnection connectionWithRequest:delegate:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle NSURLConnection::connectionWithRequest:delegate:");
 
     originalSelector = @selector(initWithRequest:delegate:startImmediately:);
     swizzledSelector = @selector(greyswizzled_initWithRequest:delegate:startImmediately:);
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:originalSelector
                                  withMethod:swizzledSelector];
-    NSAssert(swizzleSuccess,
-             @"Cannot swizzle NSURLConnection initWithRequest:delegate:startImmediately:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle "
+                               @"NSURLConnection::initWithRequest:delegate:startImmediately:");
 
     originalSelector = @selector(initWithRequest:delegate:);
     swizzledSelector = @selector(greyswizzled_initWithRequest:delegate:);
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:originalSelector
                                  withMethod:swizzledSelector];
-    NSAssert(swizzleSuccess, @"Cannot swizzle NSURLConnection initWithRequest:delegate:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle NSURLConnection::initWithRequest:delegate:");
 
     originalSelector = @selector(start);
     swizzledSelector = @selector(greyswizzled_start);
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:originalSelector
                                  withMethod:swizzledSelector];
-    NSAssert(swizzleSuccess, @"Cannot swizzle NSURLConnection start");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle NSURLConnection::start");
 
     originalSelector = @selector(cancel);
     swizzledSelector = @selector(greyswizzled_cancel);
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:originalSelector
                                  withMethod:swizzledSelector];
-    NSAssert(swizzleSuccess, @"Cannot swizzle NSURLConnection cancel");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle NSURLConnection::cancel");
   }
 }
 
-/**
- *  Tracks the current connection as pending in GREYAppStateTracker.
- */
+#pragma mark - Package Internal
+
 - (void)grey_trackPending {
-  NSString *elementID = TRACK_STATE_FOR_ELEMENT(kGREYPendingNetworkRequest, self);
+  GREYAppStateTrackerObject *object = TRACK_STATE_FOR_OBJECT(kGREYPendingNetworkRequest, self);
   objc_setAssociatedObject(self,
                            @selector(grey_trackPending),
-                           elementID,
+                           object,
                            OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-/**
- *  Untracks the current connection from GREYAppStateTracker, marking it as completed.
- */
 - (void)grey_untrackPending {
-  NSString *elementID = objc_getAssociatedObject(self, @selector(grey_trackPending));
-  UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYPendingNetworkRequest, elementID);
+  GREYAppStateTrackerObject *object =
+      objc_getAssociatedObject(self, @selector(grey_trackPending));
+  UNTRACK_STATE_FOR_OBJECT(kGREYPendingNetworkRequest, object);
 }
 
 #pragma mark - Swizzled Implementation
@@ -110,11 +114,11 @@ typedef void (^NSURLConnectionCompletionBlock)(NSURLResponse *, NSData *, NSErro
 + (NSData *)greyswizzled_sendSynchronousRequest:(NSURLRequest *)request
                               returningResponse:(NSURLResponse **)response
                                           error:(NSError **)error {
-  NSString *elementID;
+  GREYAppStateTrackerObject *object;
   NSObject *uniqueIdentifier;
   if ([request.URL grey_shouldSynchronize] && ![NSThread isMainThread]) {
     uniqueIdentifier = [[NSObject alloc] init];
-    elementID = TRACK_STATE_FOR_ELEMENT(kGREYPendingNetworkRequest, uniqueIdentifier);
+    object = TRACK_STATE_FOR_OBJECT(kGREYPendingNetworkRequest, uniqueIdentifier);
   }
 
   NSData *data =
@@ -123,8 +127,8 @@ typedef void (^NSURLConnectionCompletionBlock)(NSURLResponse *, NSData *, NSErro
                            request,
                            response,
                            error);
-  if (elementID) {
-    UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYPendingNetworkRequest, elementID);
+  if (object) {
+    UNTRACK_STATE_FOR_OBJECT(kGREYPendingNetworkRequest, object);
     // Hold a reference to the unique identifier until we no longer track the connection.
     uniqueIdentifier = nil;
   }
@@ -139,12 +143,13 @@ typedef void (^NSURLConnectionCompletionBlock)(NSURLResponse *, NSData *, NSErro
   if ([request.URL grey_shouldSynchronize]) {
     // Use a unique identifier to track connection.
     __block NSObject *uniqueIdentifier = [[NSObject alloc] init];
-    NSString *elementID = TRACK_STATE_FOR_ELEMENT(kGREYPendingNetworkRequest, uniqueIdentifier);
+    GREYAppStateTrackerObject *object =
+        TRACK_STATE_FOR_OBJECT(kGREYPendingNetworkRequest, uniqueIdentifier);
     completionHandler = ^(NSURLResponse *response,
                           NSData *data,
                           NSError *error) {
       handler(response, data, error);
-      UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYPendingNetworkRequest, elementID);
+      UNTRACK_STATE_FOR_OBJECT(kGREYPendingNetworkRequest, object);
       // Hold a reference to the unique identifier until we no longer track the connection.
       uniqueIdentifier = nil;
     };

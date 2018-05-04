@@ -14,16 +14,11 @@
 // limitations under the License.
 //
 
-#import <EarlGrey/NSError+GREYAdditions.h>
-
 #import "FTRBaseIntegrationTest.h"
 #import "FTRFailureHandler.h"
-
-// Expose private action for testing
-@interface GREYActions (GREYExposedForTesting)
-+ (id<GREYAction>)grey_actionForTypeText:(NSString *)text
-                        atUITextPosition:(UITextPosition *)position;
-@end
+#import "Action/GREYActions+Internal.h"
+#import "Additions/NSError+GREYAdditions.h"
+#import "Core/GREYKeyboard.h"
 
 @interface FTRKeyboardKeysTest : FTRBaseIntegrationTest
 @end
@@ -141,7 +136,7 @@
     GREYFail(@"Should throw an exception");
   } @catch (NSException *exception) {
     NSRange exceptionRange =
-        [[exception reason] rangeOfString:@"Action 'Type \"Should Fail\"' failed."];
+        [[exception reason] rangeOfString:@"\"Action Name\":  \"Type 'Should Fail'\""];
     GREYAssertTrue(exceptionRange.length > 0, @"Should throw exception indicating action failure.");
   }
 }
@@ -462,12 +457,84 @@
       assertWithMatcher:grey_accessibilityLabel(@"Foo")];
 }
 
-// TODO(31886754):Enabled this for testing the Input Accessory Code
-- (void)DISABLED_testTypingOnTextFieldInUIInputAccessory {
+- (void)testTypingOnTextFieldInUIInputAccessory {
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"Input Button")]
       performAction:grey_tap()];
-  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"TypingTextField")]
-      performAction:grey_typeText(@"Test")];
+  [[[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"InputAccessoryTextField")]
+      performAction:grey_typeText(@"Test")] assertWithMatcher:grey_text(@"Test")];
+}
+
+- (void)testClearAndReplaceWorksWithUIAccessibilityTextFieldElement {
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"Input Button")]
+      performAction:grey_tap()];
+
+  Class accessibilityTextFieldElemClass = NSClassFromString(@"UIAccessibilityTextFieldElement");
+  id<GREYMatcher> elementMatcher = grey_allOf(grey_accessibilityValue(@"Text Field"),
+                                              grey_kindOfClass(accessibilityTextFieldElemClass),
+                                              nil);
+  [[[EarlGrey selectElementWithMatcher:elementMatcher]
+      performAction:grey_clearText()]
+      performAction:grey_replaceText(@"foo")];
+
+  [[EarlGrey selectElementWithMatcher:grey_textFieldValue(@"foo")]
+      assertWithMatcher:grey_text(@"foo")];
+}
+
+- (void)testIsKeyboardShownWithCustomKeyboardTracker {
+  GREYActionBlock *setResponderBlock =
+  [GREYActionBlock actionWithName:@"Set First Responder"
+      performBlock:^BOOL(id element, NSError *__strong *errorOrNil) {
+          return [element becomeFirstResponder];
+      }];
+
+  GREYAssertFalse([GREYKeyboard isKeyboardShown], @"Keyboard Shouldn't be Shown");
+
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"CustomKeyboardTracker")]
+      performAction:setResponderBlock];
+  GREYAssertFalse([GREYKeyboard isKeyboardShown], @"Keyboard Shouldn't be Shown");
+}
+
+- (void)testTypingAndResigningOfFirstResponder {
+  GREYAssertFalse([GREYKeyboard isKeyboardShown], @"Keyboard Shouldn't be Shown");
+
+  [[[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"TypingTextField")]
+      performAction:[GREYActions actionForTypeText:@"Foo"]]
+      assertWithMatcher:grey_text(@"Foo")];
+  GREYAssertTrue([GREYKeyboard isKeyboardShown], @"Keyboard Shouldn't be Shown");
+
+  [EarlGrey dismissKeyboardWithError:nil];
+  GREYAssertFalse([GREYKeyboard isKeyboardShown], @"Keyboard Shouldn't be Shown as it is resigned");
+
+  [[[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"TypingTextField")]
+      performAction:[GREYActions actionForTypeText:@"Foo"]]
+      assertWithMatcher:grey_text(@"FooFoo")];
+  GREYAssertTrue([GREYKeyboard isKeyboardShown], @"Keyboard Shouldn't be Shown");
+}
+
+- (void)testTypingAndResigningWithError {
+  GREYAssertFalse([GREYKeyboard isKeyboardShown], @"Keyboard Shouldn't be Shown");
+
+  GREYActionBlock *setResponderBlock =
+      [GREYActionBlock actionWithName:@"Set First Responder"
+                         performBlock:^BOOL(id element, NSError *__strong *errorOrNil) {
+                           [element becomeFirstResponder];
+                           return YES;
+                         }];
+  NSError *error;
+  [EarlGrey dismissKeyboardWithError:&error];
+  NSString *localizedErrorDescription = [error localizedDescription];
+  GREYAssertEqualObjects(localizedErrorDescription,
+                         @"Failed to dismiss keyboard since it was not showing.",
+                         @"Unexpected error message for initial dismiss: %@, original error: %@",
+                         localizedErrorDescription, error);
+
+  [[EarlGrey selectElementWithMatcher:grey_keyWindow()] performAction:setResponderBlock];
+  [EarlGrey dismissKeyboardWithError:&error];
+  localizedErrorDescription = [error localizedDescription];
+  GREYAssertEqualObjects(localizedErrorDescription,
+                         @"Failed to dismiss keyboard since it was not showing.",
+                         @"Unexpected error message for second dismiss: %@, original error: %@",
+                         localizedErrorDescription, error);
 }
 
 #pragma mark - Private

@@ -15,9 +15,11 @@
 //
 
 #import "Common/GREYConfiguration.h"
-#import "Common/GREYVerboseLogger.h"
 
 #import "Additions/NSString+GREYAdditions.h"
+#import "Common/GREYFatalAsserts.h"
+#import "Common/GREYLogger.h"
+#import "Common/GREYThrowDefines.h"
 
 NSString *const kGREYConfigKeyAnalyticsEnabled = @"GREYConfigKeyAnalyticsEnabled";
 NSString *const kGREYConfigKeyActionConstraintsEnabled = @"GREYConfigKeyActionConstraintsEnabled";
@@ -35,7 +37,7 @@ NSString *const kGREYConfigKeyDispatchAfterMaxTrackableDelay =
 NSString *const kGREYConfigKeyDelayedPerformMaxTrackableDuration =
     @"GREYConfigKeyDelayedPerformMaxTrackableDuration";
 NSString *const kGREYConfigKeyIncludeStatusBarWindow = @"GREYConfigKeyIncludeStatusBarWindow";
-NSString *const kGREYConfigKeyScreenshotDirLocation = @"GREYConfigKeyScreenshotDirLocation";
+NSString *const kGREYConfigKeyArtifactsDirLocation = @"GREYConfigKeyArtifactsDirLocation";
 
 @implementation GREYConfiguration {
   NSMutableDictionary *_defaultConfiguration; // Dict for storing the default configs
@@ -56,12 +58,12 @@ NSString *const kGREYConfigKeyScreenshotDirLocation = @"GREYConfigKeyScreenshotD
     NSArray *searchPaths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,
                                                                NSUserDomainMask,
                                                                YES);
-    NSAssert(searchPaths.count > 0, @"Couldn't find a valid documents directory");
-    [self setDefaultValue:searchPaths.firstObject forConfigKey:kGREYConfigKeyScreenshotDirLocation];
+    GREYFatalAssertWithMessage(searchPaths.count > 0, @"Couldn't find a valid documents directory");
+    [self setDefaultValue:searchPaths.firstObject forConfigKey:kGREYConfigKeyArtifactsDirLocation];
     [self setDefaultValue:@YES forConfigKey:kGREYConfigKeyAnalyticsEnabled];
     [self setDefaultValue:@YES forConfigKey:kGREYConfigKeyActionConstraintsEnabled];
-    [self setDefaultValue:@(30.0) forConfigKey:kGREYConfigKeyInteractionTimeoutDuration];
-    [self setDefaultValue:@(10.0) forConfigKey:kGREYConfigKeyCALayerMaxAnimationDuration];
+    [self setDefaultValue:@(30) forConfigKey:kGREYConfigKeyInteractionTimeoutDuration];
+    [self setDefaultValue:@(10) forConfigKey:kGREYConfigKeyCALayerMaxAnimationDuration];
     [self setDefaultValue:@YES forConfigKey:kGREYConfigKeySynchronizationEnabled];
     [self setDefaultValue:@(1.5) forConfigKey:kGREYConfigKeyNSTimerMaxTrackableInterval];
     [self setDefaultValue:@YES forConfigKey:kGREYConfigKeyCALayerModifyAnimations];
@@ -73,7 +75,7 @@ NSString *const kGREYConfigKeyScreenshotDirLocation = @"GREYConfigKeyScreenshotD
   return self;
 }
 
-+ (id)sharedInstance {
++ (instancetype)sharedInstance {
   static GREYConfiguration *sharedInstance = nil;
   static dispatch_once_t token = 0;
 
@@ -85,7 +87,8 @@ NSString *const kGREYConfigKeyScreenshotDirLocation = @"GREYConfigKeyScreenshotD
 }
 
 - (void)setValue:(id)value forConfigKey:(NSString *)configKey {
-  NSParameterAssert(value);
+  GREYThrowOnNilParameter(value);
+
   [self grey_validateConfigKey:configKey];
 
   @synchronized(self) {
@@ -96,7 +99,8 @@ NSString *const kGREYConfigKeyScreenshotDirLocation = @"GREYConfigKeyScreenshotD
 }
 
 - (void)setDefaultValue:(id)value forConfigKey:(NSString *)configKey {
-  NSParameterAssert(value);
+  GREYThrowOnNilParameter(value);
+
   [self grey_validateConfigKey:configKey];
 
   @synchronized(self) {

@@ -18,9 +18,11 @@
 
 #include <objc/runtime.h>
 
-#import "Common/GREYExposed.h"
+#import "Common/GREYAppleInternals.h"
+#import "Common/GREYFatalAsserts.h"
 #import "Common/GREYSwizzler.h"
 #import "Synchronization/GREYAppStateTracker.h"
+#import "Synchronization/GREYAppStateTrackerObject.h"
 
 /**
  *  List for all the runloop modes that have been pushed and unpopped using UIApplication's push/pop
@@ -40,27 +42,33 @@ static NSMutableArray *gRunLoopModes;
     BOOL swizzleSuccess = [swizzler swizzleClass:self
                            replaceInstanceMethod:originalSel
                                       withMethod:swizzledSel];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIApplication beginIgnoringInteractionEvents");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIApplication beginIgnoringInteractionEvents");
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(endIgnoringInteractionEvents)
                                  withMethod:@selector(greyswizzled_endIgnoringInteractionEvents)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIApplication endIgnoringInteractionEvents");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIApplication endIgnoringInteractionEvents");
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(pushRunLoopMode:)
                                  withMethod:@selector(greyswizzled_pushRunLoopMode:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIApplication pushRunLoopMode:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIApplication pushRunLoopMode:");
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(pushRunLoopMode:requester:)
                                  withMethod:@selector(greyswizzled_pushRunLoopMode:requester:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIApplication pushRunLoopMode:requester:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIApplication pushRunLoopMode:requester:");
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(popRunLoopMode:)
                                  withMethod:@selector(greyswizzled_popRunLoopMode:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIApplication popRunLoopMode:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIApplication popRunLoopMode:");
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(popRunLoopMode:requester:)
                                  withMethod:@selector(greyswizzled_popRunLoopMode:requester:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIApplication popRunLoopMode:requester:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIApplication popRunLoopMode:requester:");
   }
 }
 
@@ -75,10 +83,11 @@ static NSMutableArray *gRunLoopModes;
 
 - (void)greyswizzled_beginIgnoringInteractionEvents {
   INVOKE_ORIGINAL_IMP(void, @selector(greyswizzled_beginIgnoringInteractionEvents));
-  NSString *elementID = TRACK_STATE_FOR_ELEMENT(kGREYIgnoringSystemWideUserInteraction, self);
+  GREYAppStateTrackerObject *object =
+      TRACK_STATE_FOR_OBJECT(kGREYIgnoringSystemWideUserInteraction, self);
   objc_setAssociatedObject(self,
                            @selector(greyswizzled_beginIgnoringInteractionEvents),
-                           elementID,
+                           object,
                            OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
@@ -86,9 +95,9 @@ static NSMutableArray *gRunLoopModes;
   INVOKE_ORIGINAL_IMP(void, @selector(greyswizzled_endIgnoringInteractionEvents));
   // begin/end can be nested, instead of keeping the count, simply use isIgnoringInteractionEvents.
   if (!self.isIgnoringInteractionEvents) {
-    NSString *elementID =
+    GREYAppStateTrackerObject *object =
         objc_getAssociatedObject(self, @selector(greyswizzled_beginIgnoringInteractionEvents));
-    UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYIgnoringSystemWideUserInteraction, elementID);
+    UNTRACK_STATE_FOR_OBJECT(kGREYIgnoringSystemWideUserInteraction, object);
     objc_setAssociatedObject(self,
                              @selector(greyswizzled_beginIgnoringInteractionEvents),
                              nil,
@@ -116,7 +125,7 @@ static NSMutableArray *gRunLoopModes;
   INVOKE_ORIGINAL_IMP2(void, @selector(greyswizzled_popRunLoopMode:requester:), mode, requester);
 }
 
-#pragma mark - Private Methods
+#pragma mark - Private
 
 - (void)grey_pushRunLoopMode:(NSString *)mode {
   @synchronized(gRunLoopModes) {

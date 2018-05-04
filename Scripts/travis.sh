@@ -19,6 +19,8 @@ set -euxo pipefail
 xcodebuild -version
 xcodebuild -showsdks
 
+gem install cocoapods
+
 CONFIG="Debug"
 ACTION="test"
 
@@ -41,10 +43,13 @@ execute_xcodebuild() {
   # Are we running a test?
   [[ "${ACTION}" == *"test"* ]] && is_running_test=1 || is_running_test=0
 
+  # Are we running a workspace or a project?
+  [[ "${1}" == *".xcodeproj"* ]] && file_type="-project" || file_type="-workspace"
+
   for retry_attempts in {1..3}; do
     # As we are attempting retries, disable exiting when command below fails.
     set +e
-    env NSUnbufferedIO=YES xcodebuild -project ${1} -scheme ${2} -sdk "$SDK" -destination "$DESTINATION" -configuration "$CONFIG" ONLY_ACTIVE_ARCH=NO $ACTION | tee xcodebuild.log | xcpretty -sc;
+    env NSUnbufferedIO=YES xcodebuild ${file_type} ${1} -scheme ${2} -sdk "$SDK" -destination "$DESTINATION" -configuration "$CONFIG" ONLY_ACTIVE_ARCH=NO $ACTION | tee xcodebuild.log | xcpretty -sc;
     retval_command=$?
 
     # Retry condition 1: Tests haven't started.
@@ -97,10 +102,25 @@ elif [ "${TYPE}" == "CONTRIB" ]; then
   execute_xcodebuild Demo/EarlGreyContribs/EarlGreyContribs.xcodeproj EarlGreyContribsTests
 elif [ "${TYPE}" == "CONTRIB_SWIFT" ]; then
   execute_xcodebuild Demo/EarlGreyContribs/EarlGreyContribs.xcodeproj EarlGreyContribsSwiftTests
+elif [ "${TYPE}" == "EXAMPLE_PODS" ]; then
+  pod install --project-directory=Demo/EarlGreyExample
+  execute_xcodebuild Demo/EarlGreyExample/EarlGreyExample.xcworkspace EarlGreyExampleTests
+elif [ "${TYPE}" == "EXAMPLE_PODS_SWIFT" ]; then
+  gem uninstall -aIx nanaimo
+  cd gem/
+  bundle install
+  rake install
+  cd ../Demo/EarlGreyExample
+  pod update
+  cd ../../
+  pod install --project-directory=Demo/EarlGreyExample
+  execute_xcodebuild Demo/EarlGreyExample/EarlGreyExample.xcworkspace EarlGreyExampleSwiftTests
 elif [ "${TYPE}" == "CARTHAGE" ]; then
   CONFIG="Release"
   ACTION="clean build"
   execute_xcodebuild EarlGrey.xcodeproj EarlGrey
+elif [ "${TYPE}" == "PACKAGE" ]; then
+  Scripts/package.sh
 else
   echo "Unrecognized Type: ${TYPE}"
   exit 1

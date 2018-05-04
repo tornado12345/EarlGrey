@@ -15,7 +15,6 @@
 //
 
 #import <EarlGrey/GREYScreenshotUtil.h>
-
 #import "GREYBaseTest.h"
 
 @interface GREYScreenshotUtilTest : GREYBaseTest
@@ -25,7 +24,7 @@
 
 - (void)testExceptionOnNilImage {
   NSString *filename = @"dummyFileName";
-  NSString *screenshotDir = GREY_CONFIG_STRING(kGREYConfigKeyScreenshotDirLocation);
+  NSString *screenshotDir = GREY_CONFIG_STRING(kGREYConfigKeyArtifactsDirLocation);
 
   // The original saveImageAsPNG was swizzled by GREYBaseTest, so check the original version.
   XCTAssertThrowsSpecificNamed([GREYScreenshotUtil greyswizzled_fakeSaveImageAsPNG:nil
@@ -37,7 +36,7 @@
 
 - (void)testExceptionOnNilFileName {
   UIImage *image = [[UIImage alloc] init];
-  NSString *screenshotDir = GREY_CONFIG_STRING(kGREYConfigKeyScreenshotDirLocation);
+  NSString *screenshotDir = GREY_CONFIG_STRING(kGREYConfigKeyArtifactsDirLocation);
 
   // The original saveImageAsPNG was swizzled by GREYBaseTest, so check the original version.
   XCTAssertThrowsSpecificNamed([GREYScreenshotUtil greyswizzled_fakeSaveImageAsPNG:image
@@ -62,12 +61,35 @@
 - (void)testScreenshotSucceedsOnCorrectValues {
   UIImage *image = [[UIImage alloc] init];
   NSString *filename = @"dummyFileName";
-  NSString *screenshotDir = GREY_CONFIG_STRING(kGREYConfigKeyScreenshotDirLocation);
+  NSString *screenshotDir = GREY_CONFIG_STRING(kGREYConfigKeyArtifactsDirLocation);
 
   // The original saveImageAsPNG was swizzled by GREYBaseTest, so check the original version.
   XCTAssertNoThrow([GREYScreenshotUtil greyswizzled_fakeSaveImageAsPNG:image
                                                                 toFile:filename
                                                            inDirectory:screenshotDir]);
+}
+
+- (void)testSnapshotInvalidUIView {
+  UIView *element = [[UIView alloc] initWithFrame:CGRectMake(1, 1, 0, 5)];
+  UIImage *image = [GREYScreenshotUtil snapshotElement:element];
+  XCTAssertNil(image);
+
+  element = [[UIView alloc] initWithFrame:CGRectMake(2, 2, 5, 0)];
+  image = [GREYScreenshotUtil snapshotElement:element];
+  XCTAssertNil(image);
+}
+
+- (void)testSnapshotInvalidAccessibilityElement {
+  UIView *container = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 10, 10)];
+  UIAccessibilityElement *element =
+      [[UIAccessibilityElement alloc] initWithAccessibilityContainer:container];
+  element.accessibilityFrame = CGRectMake(1, 1, 0, 5);
+  UIImage *image = [GREYScreenshotUtil snapshotElement:element];
+  XCTAssertNil(image);
+
+  element.accessibilityFrame = CGRectMake(2, 2, 5, 0);
+  image = [GREYScreenshotUtil snapshotElement:element];
+  XCTAssertNil(image);
 }
 
 @end

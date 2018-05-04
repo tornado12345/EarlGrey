@@ -14,9 +14,11 @@
 // limitations under the License.
 //
 
+#import <Foundation/Foundation.h>
+
 /**
- *  A NSAssertionHandler for FTR tests to capture NSAsserts. Note that NSAsserts are captured and
- *  saved but not raised again.
+ *  An NSAssertionHandler for FTR tests to capture NSAssert.
+ *  Note that NSAssert are captured and saved but not raised again.
  */
 @interface FTRAssertionHandler : NSAssertionHandler
 

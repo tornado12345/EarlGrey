@@ -18,10 +18,18 @@
 
 #include <objc/runtime.h>
 
-#import "Common/GREYExposed.h"
+#import "Common/GREYAppleInternals.h"
+#import "Common/GREYFatalAsserts.h"
+#import "Common/GREYLogger.h"
 #import "Common/GREYSwizzler.h"
-#import "Common/GREYVerboseLogger.h"
 #import "Synchronization/GREYAppStateTracker.h"
+#import "Synchronization/GREYAppStateTrackerObject.h"
+
+/**
+ *  The class for UICompatibilityInputViewController which isn't tracked here since we've faced
+ *  issues with tracking it when it comes to typing on keyboards with accessory views.
+ */
+static Class gCompatibilityVCClass;
 
 @implementation UIViewController (GREYAdditions)
 
@@ -32,50 +40,59 @@
     BOOL swizzleSuccess = [swizzler swizzleClass:self
                            replaceInstanceMethod:@selector(viewWillAppear:)
                                       withMethod:@selector(greyswizzled_viewWillAppear:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIViewController viewWillAppear");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle UIViewController viewWillAppear");
     // Swizzle viewDidAppear.
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(viewDidAppear:)
                                  withMethod:@selector(greyswizzled_viewDidAppear:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIViewController viewDidAppear");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle UIViewController viewDidAppear");
     // Swizzle viewWillDisappear.
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(viewWillDisappear:)
                                  withMethod:@selector(greyswizzled_viewWillDisappear:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIViewController viewWillDisappear");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIViewController viewWillDisappear");
     // Swizzle viewDidDisappear.
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(viewDidDisappear:)
                                  withMethod:@selector(greyswizzled_viewDidDisappear:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIViewController viewDidDisappear");
+    GREYFatalAssertWithMessage(swizzleSuccess, @"Cannot swizzle UIViewController viewDidDisappear");
     // Swizzle viewWillMoveToWindow.
     swizzleSuccess = [swizzler swizzleClass:self
                       replaceInstanceMethod:@selector(viewWillMoveToWindow:)
                                  withMethod:@selector(greyswizzled_viewWillMoveToWindow:)];
-    NSAssert(swizzleSuccess, @"Cannot swizzle UIViewController viewWillMoveToWindow:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIViewController viewWillMoveToWindow:");
     // Swizzle viewDidMoveToWindow:shouldAppearOrDisappear.
     SEL swizzledSel = @selector(greyswizzled_viewDidMoveToWindow:shouldAppearOrDisappear:);
     swizzleSuccess =
         [swizzler swizzleClass:self
          replaceInstanceMethod:@selector(viewDidMoveToWindow:shouldAppearOrDisappear:)
                     withMethod:swizzledSel];
-    NSAssert(swizzleSuccess,
-             @"Cannot swizzle UIViewController viewDidMoveToWindow:shouldAppearOrDisappear:");
+    GREYFatalAssertWithMessage(swizzleSuccess,
+                               @"Cannot swizzle UIViewController viewDidMoveToWindow:"
+                               @"shouldAppearOrDisappear:");
   }
+}
+
+__attribute__((constructor)) static void initialize(void) {
+  gCompatibilityVCClass = NSClassFromString(@"UICompatibilityInputViewController");
 }
 
 - (void)grey_trackAsRootViewControllerForWindow:(UIWindow *)window {
   // Untrack state for hidden (or nil) windows. When window becomes visible, this method will be
   // called again.
   if (!window || window.hidden) {
-    NSString *elementID = objc_getAssociatedObject(self, @selector(greyswizzled_viewWillAppear:));
+    GREYAppStateTrackerObject *object =
+        objc_getAssociatedObject(self, @selector(greyswizzled_viewWillAppear:));
     GREYAppState state = kGREYPendingViewsToAppear | kGREYPendingRootViewControllerToAppear;
-    UNTRACK_STATE_FOR_ELEMENT_WITH_ID(state, elementID);
+    UNTRACK_STATE_FOR_OBJECT(state, object);
   } else if (![self grey_hasAppeared]) {
-    NSString *elementID = TRACK_STATE_FOR_ELEMENT(kGREYPendingRootViewControllerToAppear, self);
+    GREYAppStateTrackerObject *object =
+        TRACK_STATE_FOR_OBJECT(kGREYPendingRootViewControllerToAppear, self);
     objc_setAssociatedObject(self,
                              @selector(greyswizzled_viewWillAppear:),
-                             elementID,
+                             object,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
   }
 }
@@ -95,11 +112,12 @@
   // Untrack the UIViewController when it moves to a nil window. We must clear the state regardless
   // of |arg|, because viewDidAppear, viewWillDisappear or viewDidDisappear will not be called.
   if (!window) {
-    NSString *elementID = objc_getAssociatedObject(self, @selector(greyswizzled_viewWillAppear:));
+    GREYAppStateTrackerObject *object =
+        objc_getAssociatedObject(self, @selector(greyswizzled_viewWillAppear:));
     GREYAppState state = (kGREYPendingViewsToAppear |
                           kGREYPendingRootViewControllerToAppear |
                           kGREYPendingViewsToDisappear);
-    UNTRACK_STATE_FOR_ELEMENT_WITH_ID(state, elementID);
+    UNTRACK_STATE_FOR_OBJECT(state, object);
   }
   INVOKE_ORIGINAL_IMP2(void,
                        @selector(greyswizzled_viewDidMoveToWindow:shouldAppearOrDisappear:),
@@ -108,38 +126,44 @@
 }
 
 - (void)greyswizzled_viewWillAppear:(BOOL)animated {
-  BOOL movingToNilWindow = [self grey_isMovingToNilWindow];
-  if (movingToNilWindow) {
-    GREYLogVerbose(@"View is moving to nil window. Skipping viewWillAppear state tracking.");
-  }
-
-  if (!movingToNilWindow) {
-    // Interactive transitions can cancel and cause imbalance of will and did calls.
-    id<UIViewControllerTransitionCoordinator> coordinator = [self transitionCoordinator];
-    if (coordinator && [coordinator initiallyInteractive]) {
-      [coordinator notifyWhenInteractionEndsUsingBlock:
-          ^(id<UIViewControllerTransitionCoordinatorContext> context) {
-            if ([context isCancelled]) {
-              NSString *elementID =
-                  objc_getAssociatedObject(self, @selector(greyswizzled_viewWillAppear:));
-              UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYPendingViewsToAppear, elementID);
-            }
-          }];
+  // For a UICompatibilityInputViewController, do not track this state due to issues seen with
+  // untracking.
+  if (![self isKindOfClass:gCompatibilityVCClass]) {
+    BOOL movingToNilWindow = [self grey_isMovingToNilWindow];
+    if (movingToNilWindow) {
+      GREYLogVerbose(@"View is moving to nil window. Skipping viewWillAppear state tracking.");
     }
 
-    NSString *elementID = TRACK_STATE_FOR_ELEMENT(kGREYPendingViewsToAppear, self);
-    objc_setAssociatedObject(self,
-                             @selector(greyswizzled_viewWillAppear:),
-                             elementID,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (!movingToNilWindow) {
+      // Interactive transitions can cancel and cause imbalance of will and did calls.
+      id<UIViewControllerTransitionCoordinator> coordinator = [self transitionCoordinator];
+      if (coordinator && [coordinator initiallyInteractive]) {
+        [coordinator notifyWhenInteractionEndsUsingBlock:
+         ^(id<UIViewControllerTransitionCoordinatorContext> context) {
+           if ([context isCancelled]) {
+             id object =
+                 objc_getAssociatedObject(self, @selector(greyswizzled_viewWillAppear:));
+             UNTRACK_STATE_FOR_OBJECT(kGREYPendingViewsToAppear, object);
+           }
+         }];
+      }
+
+      GREYAppStateTrackerObject *object =
+          TRACK_STATE_FOR_OBJECT(kGREYPendingViewsToAppear, self);
+      objc_setAssociatedObject(self,
+                               @selector(greyswizzled_viewWillAppear:),
+                               object,
+                               OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
   }
   INVOKE_ORIGINAL_IMP1(void, @selector(greyswizzled_viewWillAppear:), animated);
 }
 
 - (void)greyswizzled_viewDidAppear:(BOOL)animated {
-  NSString *elementID = objc_getAssociatedObject(self, @selector(greyswizzled_viewWillAppear:));
+  GREYAppStateTrackerObject *object =
+      objc_getAssociatedObject(self, @selector(greyswizzled_viewWillAppear:));
   GREYAppState state = kGREYPendingViewsToAppear | kGREYPendingRootViewControllerToAppear;
-  UNTRACK_STATE_FOR_ELEMENT_WITH_ID(state, elementID);
+  UNTRACK_STATE_FOR_OBJECT(state, object);
 
   [self grey_setAppeared:YES];
   INVOKE_ORIGINAL_IMP1(void, @selector(greyswizzled_viewDidAppear:), animated);
@@ -158,28 +182,30 @@
       [coordinator notifyWhenInteractionEndsUsingBlock:
           ^(id<UIViewControllerTransitionCoordinatorContext> context) {
             if ([context isCancelled]) {
-              NSString *elementID =
+              GREYAppStateTrackerObject *object =
                   objc_getAssociatedObject(self, @selector(greyswizzled_viewWillAppear:));
-              UNTRACK_STATE_FOR_ELEMENT_WITH_ID(kGREYPendingViewsToDisappear, elementID);
+              UNTRACK_STATE_FOR_OBJECT(kGREYPendingViewsToDisappear, object);
             }
           }];
     }
 
-    NSString *elementID = TRACK_STATE_FOR_ELEMENT(kGREYPendingViewsToDisappear, self);
+    GREYAppStateTrackerObject *object =
+        TRACK_STATE_FOR_OBJECT(kGREYPendingViewsToDisappear, self);
     objc_setAssociatedObject(self,
                              @selector(greyswizzled_viewWillAppear:),
-                             elementID,
+                             object,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
   }
   INVOKE_ORIGINAL_IMP1(void, @selector(greyswizzled_viewWillDisappear:), animated);
 }
 
 - (void)greyswizzled_viewDidDisappear:(BOOL)animated {
-  NSString *elementID = objc_getAssociatedObject(self, @selector(greyswizzled_viewWillAppear:));
+  GREYAppStateTrackerObject *object =
+      objc_getAssociatedObject(self, @selector(greyswizzled_viewWillAppear:));
   GREYAppState state = (kGREYPendingViewsToAppear |
                         kGREYPendingRootViewControllerToAppear |
                         kGREYPendingViewsToDisappear);
-  UNTRACK_STATE_FOR_ELEMENT_WITH_ID(state, elementID);
+  UNTRACK_STATE_FOR_OBJECT(state, object);
 
   [self grey_setAppeared:NO];
   INVOKE_ORIGINAL_IMP1(void, @selector(greyswizzled_viewDidDisappear:), animated);

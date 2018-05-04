@@ -19,8 +19,9 @@
 #import <CoreData/CoreData.h>
 #import <objc/runtime.h>
 
-#import "Common/GREYPrivate.h"
+#import "Common/GREYThrowDefines.h"
 #import "Synchronization/GREYDispatchQueueIdlingResource.h"
+#import "Synchronization/GREYUIThreadExecutor+Internal.h"
 
 @implementation GREYManagedObjectContextIdlingResource {
   BOOL _trackPendingChanges;
@@ -51,8 +52,8 @@
 - (instancetype)initWithManagedObjectContext:(NSManagedObjectContext *)managedObjectContext
                          trackPendingChanges:(BOOL)trackPendingChanges
                                         name:(NSString *)name {
-  NSParameterAssert(managedObjectContext);
-  NSParameterAssert(name);
+  GREYThrowOnNilParameter(managedObjectContext);
+  GREYThrowOnNilParameter(name);
 
   self = [super init];
   if (self) {

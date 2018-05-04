@@ -20,13 +20,14 @@
 #import "Additions/UIApplication+GREYAdditions.h"
 #import "Additions/XCTestCase+GREYAdditions.h"
 #import "AppSupport/GREYIdlingResource.h"
-#import "Assertion/GREYAssertionDefines.h"
 #import "Common/GREYConfiguration.h"
 #import "Common/GREYConstants.h"
 #import "Common/GREYDefines.h"
-#import "Common/GREYPrivate.h"
+#import "Common/GREYError.h"
+#import "Common/GREYFatalAsserts.h"
+#import "Common/GREYLogger.h"
 #import "Common/GREYStopwatch.h"
-#import "Common/GREYVerboseLogger.h"
+#import "Common/GREYThrowDefines.h"
 #import "Synchronization/GREYAppStateTracker.h"
 #import "Synchronization/GREYDispatchQueueIdlingResource.h"
 #import "Synchronization/GREYOperationQueueIdlingResource.h"
@@ -52,7 +53,7 @@ static const CFTimeInterval kMaximumSynchronizationSleepInterval = 0.1;
  *  The maximum amount of time to wait for the UI and idling resources to become idle in
  *  grey_forcedStateTrackerCleanUp before forcefully clearing the state of GREYAppStateTracker.
  */
-static const CFTimeInterval kDrainTimeoutSecondsBeforeForcedStateTrackerCleanup = 5;
+static const CFTimeInterval kDrainTimeoutSecondsBeforeForcedStateTrackerCleanup = 10;
 
 // Execution states.
 typedef NS_ENUM(NSInteger, GREYExecutionState) {
@@ -107,21 +108,24 @@ typedef NS_ENUM(NSInteger, GREYExecutionState) {
     _registeredIdlingResources = [[NSMutableOrderedSet alloc] init];
 
     // Create the default idling resources.
-    id<GREYIdlingResource> defaultMainNSOperationQIdlingResource =
+    NSString *trackerName = @"Main NSOperation Queue Tracker";
+    id<GREYIdlingResource> mainNSOperationQIdlingResource =
         [GREYOperationQueueIdlingResource resourceWithNSOperationQueue:[NSOperationQueue mainQueue]
-                                                                  name:@"Main NSOperation Queue"];
-    id<GREYIdlingResource> defaultMainDispatchQIdlingResource =
+                                                                  name:trackerName];
+    id<GREYIdlingResource> mainDispatchQIdlingResource =
         [GREYDispatchQueueIdlingResource resourceWithDispatchQueue:dispatch_get_main_queue()
-                                                              name:@"Main Dispatch Queue"];
+                                                              name:@"Main Dispatch Queue Tracker"];
     id<GREYIdlingResource> appStateTrackerIdlingResource = [GREYAppStateTracker sharedInstance];
 
     // The default resources' order is important as it affects the order in which the resources
     // will be checked.
     _defaultIdlingResources =
         [[NSOrderedSet alloc] initWithObjects:appStateTrackerIdlingResource,
-                                              defaultMainDispatchQIdlingResource,
-                                              defaultMainNSOperationQIdlingResource, nil];
-    // Forcefully clear GREYAppStateTracker state during test case teardown if it is not idle.
+                                              mainNSOperationQIdlingResource,
+                                              mainDispatchQIdlingResource, nil];
+    // To forcefully clear GREYAppStateTracker state during test case teardown if it is not idle.
+    // This prevents the next test case from timing out in case the previous one puts the app into
+    // a non-idle state.
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(grey_forcedStateTrackerCleanUp)
                                                  name:kGREYXCTestCaseInstanceDidTearDown
@@ -142,8 +146,9 @@ typedef NS_ENUM(NSInteger, GREYExecutionState) {
 }
 
 - (void)drainForTime:(CFTimeInterval)seconds {
-  NSParameterAssert(seconds >= 0);
+  GREYThrowOnNilParameter(seconds >= 0);
   GREYLogVerbose(@"Active Run Loop being drained for %f seconds.", seconds);
+
   GREYStopwatch *stopwatch = [[GREYStopwatch alloc] init];
   [stopwatch start];
   // Drain the active run loop for @c seconds. Allow the run loop to sleep.
@@ -196,8 +201,8 @@ typedef NS_ENUM(NSInteger, GREYExecutionState) {
 - (BOOL)executeSyncWithTimeout:(CFTimeInterval)seconds
                          block:(GREYExecBlock)execBlock
                          error:(__strong NSError **)error {
-  I_CHECK_MAIN_THREAD();
-  NSParameterAssert(seconds >= 0);
+  GREYFatalAssertMainThread();
+  GREYThrowOnFailedCondition(seconds >= 0);
 
   BOOL isSynchronizationEnabled = GREY_CONFIG_BOOL(kGREYConfigKeySynchronizationEnabled);
   GREYRunLoopSpinner *runLoopSpinner = [[GREYRunLoopSpinner alloc] init];
@@ -219,25 +224,27 @@ typedef NS_ENUM(NSInteger, GREYExecutionState) {
     }
 
     // Spin the run loop until the all of the resources are idle or until @c seconds.
-    BOOL syncSuccess = [runLoopSpinner spinWithStopConditionBlock:^BOOL {
+    BOOL isAppIdle = [runLoopSpinner spinWithStopConditionBlock:^BOOL {
       return [self grey_areAllResourcesIdle];
     }];
 
-    if (!syncSuccess) {
+    if (!isAppIdle) {
       NSOrderedSet *busyResources = [self grey_busyResources];
-      NSString *errorDescription;
       if ([busyResources count] > 0) {
-        errorDescription = [self grey_errorDescriptionForBusyResources:busyResources];
+        NSString *description = @"Failed to execute block because idling resources below are busy.";
+        GREYPopulateErrorNotedOrLog(error,
+                                    kGREYUIThreadExecutorErrorDomain,
+                                    kGREYUIThreadExecutorTimeoutErrorCode,
+                                    description,
+                                    [self grey_errorDictionaryForBusyResources:busyResources]);
       } else {
-        errorDescription = @"Failed to synchronize, but all resources are idle after timeout.";
+        GREYPopulateErrorOrLog(error,
+                               kGREYUIThreadExecutorErrorDomain,
+                               kGREYUIThreadExecutorTimeoutErrorCode,
+                               @"Failed to idle but all resources are idle after timeout.");
       }
-
-      [NSError grey_logOrSetOutReferenceIfNonNil:error
-                                      withDomain:kGREYUIThreadExecutorErrorDomain
-                                            code:kGREYUIThreadExecutorTimeoutErrorCode
-                                  andDescription:errorDescription];
     }
-    return syncSuccess;
+    return isAppIdle;
   } else {
     // Spin the run loop with an always true stop condition. The spinner will only drain the run
     // loop for its minimum number of drains before executing the conditionMetHandler in the active
@@ -245,20 +252,14 @@ typedef NS_ENUM(NSInteger, GREYExecutionState) {
     [runLoopSpinner spinWithStopConditionBlock:^BOOL{
       return YES;
     }];
-
     return YES;
   }
 }
 
-/**
- *  Register the specified @c resource to be checked for idling before executing test actions.
- *  A strong reference is held to @c resource until it is deregistered using
- *  @c deregisterIdlingResource. It is safe to call this from any thread.
- *
- *  @param resource The idling resource to register.
- */
+#pragma mark - Package Internal
+
 - (void)registerIdlingResource:(id<GREYIdlingResource>)resource {
-  NSParameterAssert(resource);
+  GREYFatalAssert(resource);
   @synchronized(_registeredIdlingResources) {
     // Add the object at the beginning of the ordered set. Resource checking order is important for
     // stability and the default resources should be checked last.
@@ -266,13 +267,8 @@ typedef NS_ENUM(NSInteger, GREYExecutionState) {
   }
 }
 
-/**
- *  Unregisters a previously registered @c resource. It is safe to call this from any thread.
- *
- *  @param resource The resource to unregistered.
- */
 - (void)deregisterIdlingResource:(id<GREYIdlingResource>)resource {
-  NSParameterAssert(resource);
+  GREYFatalAssert(resource);
   @synchronized(_registeredIdlingResources) {
     [_registeredIdlingResources removeObject:resource];
   }
@@ -357,31 +353,13 @@ typedef NS_ENUM(NSInteger, GREYExecutionState) {
 /**
  *  @return An error description string for all of the resources in @c busyResources.
  */
-- (NSString *)grey_errorDescriptionForBusyResources:(NSOrderedSet *)busyResources {
-  NSMutableArray *busyResourcesNames = [[NSMutableArray alloc] init];
-  NSMutableArray *busyResourcesDescription = [[NSMutableArray alloc] init];
+- (NSDictionary *)grey_errorDictionaryForBusyResources:(NSOrderedSet *)busyResources {
+  NSMutableDictionary *busyResourcesNameToDesc = [[NSMutableDictionary alloc] init];
 
   for (id<GREYIdlingResource> resource in busyResources) {
-    NSString *formattedResourceName =
-        [NSString stringWithFormat:@"\'%@\'", [resource idlingResourceName]];
-    [busyResourcesNames addObject:formattedResourceName];
-
-    NSString *busyResourceDescription =
-        [NSString stringWithFormat:@"  %@ : %@",
-                                   [resource idlingResourceName],
-                                   [resource idlingResourceDescription]];
-    [busyResourcesDescription addObject:busyResourceDescription];
+    busyResourcesNameToDesc[resource.idlingResourceName] = [resource idlingResourceDescription];
   }
-
-  NSString *reason =
-      [NSString stringWithFormat:@"Failed to execute block because the following "
-                                 @"IdlingResources are busy: [%@]",
-                                 [busyResourcesNames componentsJoinedByString:@", "]];
-  NSString *details =
-      [NSString stringWithFormat:@"Busy resource description:\n%@",
-                                 [busyResourcesDescription componentsJoinedByString:@",\n"]];
-
-  return [NSString stringWithFormat:@"%@\n%@", reason, details];
+  return busyResourcesNameToDesc;
 }
 
 /**

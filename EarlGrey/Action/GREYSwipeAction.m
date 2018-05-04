@@ -17,8 +17,13 @@
 #import "Action/GREYSwipeAction.h"
 
 #import "Action/GREYPathGestureUtils.h"
+#import "Additions/NSError+GREYAdditions.h"
+#import "Additions/NSObject+GREYAdditions.h"
 #import "Additions/NSString+GREYAdditions.h"
 #import "Assertion/GREYAssertionDefines.h"
+#import "Assertion/GREYAssertions+Internal.h"
+#import "Common/GREYError.h"
+#import "Common/GREYThrowDefines.h"
 #import "Event/GREYSyntheticEvents.h"
 #import "Matcher/GREYAllOf.h"
 #import "Matcher/GREYMatcher.h"
@@ -43,10 +48,12 @@
 - (instancetype)initWithDirection:(GREYDirection)direction
                          duration:(CFTimeInterval)duration
                      percentPoint:(CGPoint)percents {
-  NSAssert(percents.x > 0.0f && percents.x < 1.0f,
-           @"xOriginStartPercentage must be between 0 and 1, exclusively");
-  NSAssert(percents.y > 0.0f && percents.y < 1.0f,
-           @"yOriginStartPercentage must be between 0 and 1, exclusively");
+  GREYThrowOnFailedConditionWithMessage(percents.x > 0.0f && percents.x < 1.0f,
+                                        @"xOriginStartPercentage must be between 0 and 1, "
+                                        @"exclusively");
+  GREYThrowOnFailedConditionWithMessage(percents.y > 0.0f && percents.y < 1.0f,
+                                        @"yOriginStartPercentage must be between 0 and 1, "
+                                        @"exclusively");
 
   NSString *name =
       [NSString stringWithFormat:@"Swipe %@ for duration %g", NSStringFromGREYDirection(direction),
@@ -97,12 +104,29 @@
     if ([element isKindOfClass:[UIWindow class]]) {
       window = (UIWindow *)element;
     } else {
-      I_GREYFail(@"Cannot swipe on view %@, as it has no window and it isn't a window itself.",
-                 element);
+      NSString *errorDescription =
+          [NSString stringWithFormat:@"Cannot swipe on view [V], as it has no window and "
+                                     @"it isn't a window itself."];
+      NSDictionary *glossary = @{ @"V" : [element grey_description]};
+      GREYError *error;
+      error = GREYErrorMake(kGREYSyntheticEventInjectionErrorDomain,
+                            kGREYOrientationChangeFailedErrorCode,
+                            errorDescription);
+      error.descriptionGlossary = glossary;
+      if (errorOrNil) {
+        *errorOrNil = error;
+      } else {
+        [GREYAssertions grey_raiseExceptionNamed:kGREYGenericFailureException
+                                exceptionDetails:@""
+                                       withError:error];
+      }
+
+      return NO;
     }
   }
   NSArray *touchPath = [GREYPathGestureUtils touchPathForGestureWithStartPoint:startPoint
                                                                   andDirection:_direction
+                                                                   andDuration:_duration
                                                                       inWindow:window];
   [GREYSyntheticEvents touchAlongPath:touchPath
                      relativeToWindow:window

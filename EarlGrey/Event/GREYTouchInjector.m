@@ -21,12 +21,16 @@
 
 #import "Additions/NSObject+GREYAdditions.h"
 #import "Additions/UITouch+GREYAdditions.h"
+#import "Additions/UIWebView+GREYAdditions.h"
 #import "Assertion/GREYAssertionDefines.h"
+#import "Common/GREYAppleInternals.h"
 #import "Common/GREYDefines.h"
-#import "Common/GREYExposed.h"
-#import "Common/GREYPrivate.h"
+#import "Common/GREYFatalAsserts.h"
+#import "Common/GREYThrowDefines.h"
 #import "Event/GREYZeroToleranceTimer.h"
 #import "Synchronization/GREYRunLoopSpinner.h"
+
+const NSTimeInterval kGREYTouchInjectionFrequency = 60.0;
 
 /**
  *  Maximum time to wait for UIWebView delegates to get called after the
@@ -35,12 +39,11 @@
 static const NSTimeInterval kGREYMaxIntervalForUIWebViewResponse = 2.0;
 
 /**
- *  The time interval in seconds between each touch injection, set to 120Hz to match peak touch
- *  refresh rate on iOS devices.
+ *  The time interval in seconds between each touch injection.
  */
-static const NSTimeInterval kTouchInjectionInterval = 1.0 / 120.0;
+static const NSTimeInterval kGREYTouchInjectionInterval = 1.0 / kGREYTouchInjectionFrequency;
 
-@interface GREYTouchInjector () <GREYZeroToleranceTimerTarget>
+@interface GREYTouchInjector() <GREYZeroToleranceTimerTarget>
 @end
 
 @implementation GREYTouchInjector {
@@ -65,7 +68,7 @@ static const NSTimeInterval kTouchInjectionInterval = 1.0 / 120.0;
 }
 
 - (instancetype)initWithWindow:(UIWindow *)window {
-  NSParameterAssert(window);
+  GREYThrowOnNilParameter(window);
 
   self = [super init];
   if (self) {
@@ -78,7 +81,7 @@ static const NSTimeInterval kTouchInjectionInterval = 1.0 / 120.0;
 }
 
 - (void)enqueueTouchInfoForDelivery:(GREYTouchInfo *)touchInfo {
-  I_CHECK_MAIN_THREAD();
+  GREYFatalAssertMainThread();
   [_enqueuedTouchInfoList addObject:touchInfo];
 }
 
@@ -87,7 +90,7 @@ static const NSTimeInterval kTouchInjectionInterval = 1.0 / 120.0;
 }
 
 - (void)startInjecting {
-  I_CHECK_MAIN_THREAD();
+  GREYFatalAssertMainThread();
 
   if (_state == kGREYTouchInjectorStarted) {
     return;
@@ -95,13 +98,14 @@ static const NSTimeInterval kTouchInjectionInterval = 1.0 / 120.0;
 
   _state = kGREYTouchInjectorStarted;
   if (!_timer) {
-    _timer = [[GREYZeroToleranceTimer alloc] initWithInterval:kTouchInjectionInterval
+    _timer = [[GREYZeroToleranceTimer alloc] initWithInterval:kGREYTouchInjectionInterval
                                                        target:self];
   }
 }
 
 - (void)waitUntilAllTouchesAreDeliveredUsingInjector {
-  I_CHECK_MAIN_THREAD();
+  GREYFatalAssertMainThread();
+
   // Start if necessary.
   if (_state == kGREYTouchInjectorPendingStart || _state == kGREYTouchInjectorStopped) {
     [self startInjecting];
@@ -120,7 +124,7 @@ static const NSTimeInterval kTouchInjectionInterval = 1.0 / 120.0;
 #pragma mark - GREYZeroToleranceTimer
 
 - (void)timerFiredWithZeroToleranceTimer:(GREYZeroToleranceTimer *)timer {
-  I_CHECK_MAIN_THREAD();
+  GREYFatalAssertMainThread();
 
   GREYTouchInfo *touchInfo =
       [self grey_dequeueTouchInfoForDeliveryWithCurrentTime:CACurrentMediaTime()];
@@ -222,8 +226,12 @@ static const NSTimeInterval kTouchInjectionInterval = 1.0 / 120.0;
   timeStamp.hi = (UInt32)(machAbsoluteTime >> 32);
   timeStamp.lo = (UInt32)(machAbsoluteTime);
 
-  for (NSUInteger i  = 0; i < [_ongoingUITouches count]; i++) {
+  UIView *currentTouchView = nil;
+  for (NSUInteger i = 0; i < [_ongoingUITouches count]; i++) {
     UITouch *currentTouch = [self grey_UITouchForFinger:i];
+    if (i == 0) {
+      currentTouchView = currentTouch.view;
+    }
     [currentTouch setTimestamp:[[NSProcessInfo processInfo] systemUptime]];
 
     IOHIDDigitizerEventMask eventMask = (currentTouch.phase == UITouchPhaseMoved)
@@ -261,33 +269,41 @@ static const NSTimeInterval kTouchInjectionInterval = 1.0 / 120.0;
   @autoreleasepool {
     _previousTouchDeliveryTime = CACurrentMediaTime();
     _previousTouchInfo = touchInfo;
+    BOOL touchViewContainsWKWebView = NO;
 
     @try {
       [[UIApplication sharedApplication] sendEvent:event];
 
-      // If a UIWebView is being tapped, allow time for delegates to be called after end touch.
-      if (touchInfo.phase == GREYTouchInfoPhaseTouchEnded) {
-        UIWebView *touchWebView = nil;
-        if (_ongoingUITouches.count > 0) {
-          UIView *touchView = [self grey_UITouchForFinger:0].view;
-          if ([touchView isKindOfClass:[UIWebView class]]) {
-            touchWebView = (UIWebView *)touchView;
+      if (currentTouchView) {
+        // If a WKWebView is being tapped, don't call [event _clearTouches], as this causes long
+        // presses to fail. For this case, the child of |currentTouchView| is a WKCompositingView.
+        UIView *firstChild = currentTouchView.subviews.firstObject;
+        if ([firstChild isKindOfClass:NSClassFromString(@"WKCompositingView")]) {
+          touchViewContainsWKWebView = YES;
+        }
+        if (touchInfo.phase == GREYTouchInfoPhaseTouchEnded) {
+          UIWebView *touchWebView = nil;
+          if ([currentTouchView isKindOfClass:[UIWebView class]]) {
+            touchWebView = (UIWebView *)currentTouchView;
           } else {
             NSArray *webViewContainers =
-                [touchView grey_containersAssignableFromClass:[UIWebView class]];
+                [currentTouchView grey_containersAssignableFromClass:[UIWebView class]];
             if (webViewContainers.count > 0) {
               touchWebView = (UIWebView *)[webViewContainers firstObject];
             }
           }
+          [touchWebView grey_pendingInteractionForTime:kGREYMaxIntervalForUIWebViewResponse];
         }
-        [touchWebView grey_pendingInteractionForTime:kGREYMaxIntervalForUIWebViewResponse];
       }
     } @catch (NSException *e) {
       [self grey_stopTouchInjection];
       @throw;
     } @finally {
-      // Clear all touches so that it is not leaked.
-      [event _clearTouches];
+      // Clear all touches so that it is not leaked, except for WKWebViews, where these calls
+      // can prevent the app tracker from becoming idle.
+      if (!touchViewContainsWKWebView) {
+        [event _clearTouches];
+      }
       // We need to release the event manually, otherwise it will leak.
       for (NSValue *hidEventValue in hidEvents) {
         IOHIDEventRef hidEvent = [hidEventValue pointerValue];

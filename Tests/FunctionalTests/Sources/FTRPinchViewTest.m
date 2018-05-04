@@ -14,10 +14,9 @@
 // limitations under the License.
 //
 
-#import <EarlGrey/GREYAssertionDefines.h>
-
 #import "FTRBaseIntegrationTest.h"
 #import "FTRImageViewController.h"
+#import <EarlGrey/EarlGrey.h>
 
 @interface FTRPinchViewTest : FTRBaseIntegrationTest
 @end
@@ -37,7 +36,8 @@
 - (void)testImageViewFrameSizeOnZoomingFastOutward {
   _imageViewFrameBeforePinch = [self ftr_imageViewFrame];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Image View")]
-      performAction:grey_pinchFastInDirection(kGREYPinchDirectionOutward)];
+      performAction:grey_pinchFastInDirectionAndAngle(kGREYPinchDirectionOutward,
+                                                      kGREYPinchAngleDefault)];
   _imageViewFrameAfterPinch = [self ftr_imageViewFrame];
   [self ftr_assertThatInitialSize:_imageViewFrameBeforePinch.size
                      andFinalSize:_imageViewFrameAfterPinch.size
@@ -47,7 +47,8 @@
 - (void)testImageViewFrameSizeOnZoomingSlowOutward {
   _imageViewFrameBeforePinch = [self ftr_imageViewFrame];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Image View")]
-      performAction:grey_pinchSlowInDirection(kGREYPinchDirectionOutward)];
+      performAction:grey_pinchSlowInDirectionAndAngle(kGREYPinchDirectionOutward,
+                                                      kGREYPinchAngleDefault)];
   _imageViewFrameAfterPinch = [self ftr_imageViewFrame];
   [self ftr_assertThatInitialSize:_imageViewFrameBeforePinch.size
                      andFinalSize:_imageViewFrameAfterPinch.size
@@ -57,7 +58,8 @@
 - (void)testImageViewFrameSizeOnZoomingFastInward {
   _imageViewFrameBeforePinch = [self ftr_imageViewFrame];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Image View")]
-      performAction:grey_pinchFastInDirection(kGREYPinchDirectionInward)];
+      performAction:grey_pinchFastInDirectionAndAngle(kGREYPinchDirectionInward,
+                                                      kGREYPinchAngleDefault)];
   _imageViewFrameAfterPinch = [self ftr_imageViewFrame];
   [self ftr_assertThatInitialSize:_imageViewFrameBeforePinch.size
                      andFinalSize:_imageViewFrameAfterPinch.size
@@ -67,11 +69,60 @@
 - (void)testImageViewFrameSizeOnZoomingSlowInward {
   _imageViewFrameBeforePinch = [self ftr_imageViewFrame];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Image View")]
-      performAction:grey_pinchSlowInDirection(kGREYPinchDirectionInward)];
+      performAction:grey_pinchFastInDirectionAndAngle(kGREYPinchDirectionInward,
+                                                      kGREYPinchAngleDefault)];
   _imageViewFrameAfterPinch = [self ftr_imageViewFrame];
   [self ftr_assertThatInitialSize:_imageViewFrameBeforePinch.size
                      andFinalSize:_imageViewFrameAfterPinch.size
                        areOrdered:NSOrderedDescending];
+}
+
+- (void)testImageViewFrameSizeOnZoomingInwardWithZeroAngle {
+  double defaultPinchAngle = 0;
+  _imageViewFrameBeforePinch = [self ftr_imageViewFrame];
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Image View")]
+      performAction:grey_pinchSlowInDirectionAndAngle(kGREYPinchDirectionInward,
+                                                      defaultPinchAngle)];
+  _imageViewFrameAfterPinch = [self ftr_imageViewFrame];
+  [self ftr_assertThatInitialSize:_imageViewFrameBeforePinch.size
+                     andFinalSize:_imageViewFrameAfterPinch.size
+                       areOrdered:NSOrderedDescending];
+}
+
+- (void)testImageViewFrameSizeOnZoomingInwardWithNegativeAngle {
+  double defaultPinchAngle = (-90.0 * M_PI / 180.0);
+  _imageViewFrameBeforePinch = [self ftr_imageViewFrame];
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Image View")]
+      performAction:grey_pinchSlowInDirectionAndAngle(kGREYPinchDirectionInward,
+                                                      defaultPinchAngle)];
+  _imageViewFrameAfterPinch = [self ftr_imageViewFrame];
+  [self ftr_assertThatInitialSize:_imageViewFrameBeforePinch.size
+                     andFinalSize:_imageViewFrameAfterPinch.size
+                       areOrdered:NSOrderedDescending];
+}
+
+- (void)testImageViewFrameSizeOnZoomingInwardWithAngle {
+  double defaultPinchAngle = (30.0 * M_PI / 180.0);
+  _imageViewFrameBeforePinch = [self ftr_imageViewFrame];
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Image View")]
+      performAction:grey_pinchFastInDirectionAndAngle(kGREYPinchDirectionInward,
+                                                      defaultPinchAngle)];
+  _imageViewFrameAfterPinch = [self ftr_imageViewFrame];
+  [self ftr_assertThatInitialSize:_imageViewFrameBeforePinch.size
+                     andFinalSize:_imageViewFrameAfterPinch.size
+                       areOrdered:NSOrderedDescending];
+}
+
+- (void)testImageViewFrameSizeOnZoomingOutwardWithAngle {
+  double defaultPinchAngle = (180.0 * M_PI / 180.0);
+  _imageViewFrameBeforePinch = [self ftr_imageViewFrame];
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Image View")]
+      performAction:grey_pinchFastInDirectionAndAngle(kGREYPinchDirectionOutward,
+                                                      defaultPinchAngle)];
+  _imageViewFrameAfterPinch = [self ftr_imageViewFrame];
+  [self ftr_assertThatInitialSize:_imageViewFrameBeforePinch.size
+                     andFinalSize:_imageViewFrameAfterPinch.size
+                       areOrdered:NSOrderedAscending];
 }
 
 #pragma mark - Private

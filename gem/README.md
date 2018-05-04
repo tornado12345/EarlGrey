@@ -17,8 +17,6 @@ Options:
                                      # Default: true
       [--swift], [--no-swift]
                                      # Default: true
-      [--swift], [--no-swift]
-                                     # Default: true
       [--swift-version]
                                      # Default: 3.0
                                      # Supported Values: 2.3, 3.0.
@@ -46,12 +44,12 @@ By default `rake` will run `spec`, `rubocop`, and `warn`.
 
 ```
 $ rake -T
-rake build                 # Build earlgrey-0.0.2.gem into the pkg directory
+rake build                 # Build the earlgrey gem into the pkg directory
 rake clean                 # Remove any temporary products
 rake clobber               # Remove any generated files
-rake install               # Build and install earlgrey-0.0.2.gem into system gems
-rake install:local         # Build and install earlgrey-0.0.2.gem into system gems without network access
-rake release[remote]       # Create tag v0.0.2 and build and push earlgrey-0.0.2.gem to Rubygems
+rake install               # Build and install earlgrey gem into system gems
+rake install:local         # Build and install earlgrey gem into system gems without network access
+rake release[remote]       # Create a version tag and build and push earlgrey gem to Rubygems
 rake rubocop               # Run RuboCop
 rake rubocop:auto_correct  # Auto-correct RuboCop offenses
 rake spec                  # Run RSpec code examples

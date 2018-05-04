@@ -16,6 +16,8 @@
 
 #import "FTRBaseIntegrationTest.h"
 
+#import <EarlGrey/EarlGrey.h>
+
 @interface FTRBasicInteractionTest : FTRBaseIntegrationTest
 @end
 
@@ -218,6 +220,54 @@
       assertWithMatcher:grey_nil()];
 }
 
+- (void)DISABLED_testLongPressOnTextField {
+  [[EarlGrey selectElementWithMatcher:[GREYMatchers matcherForText:@"Tab 2"]]
+     performAction:[GREYActions actionForTap]];
+
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"foo")]
+     performAction:[GREYActions actionForLongPressWithDuration:1.0f]];
+
+  [[EarlGrey selectElementWithMatcher:[GREYMatchers matcherForText:@"Tab 2"]]
+     assertWithMatcher:grey_notNil()];
+}
+
+- (void)testLongPressFollowedBySelectingMenuOption {
+  [[EarlGrey selectElementWithMatcher:[GREYMatchers matcherForText:@"Tab 2"]]
+      performAction:[GREYActions actionForTap]];
+
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"foo")]
+      performAction:[GREYActions actionForTypeText:@"Hello"]];
+
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"foo")]
+      performAction:[GREYActions actionForLongPressAtPoint:CGPointMake(1, 1) duration:1.0]];
+
+  [[EarlGrey selectElementWithMatcher:grey_text(@"Select")]
+      performAction:[GREYActions actionForTap]];
+
+  [[EarlGrey selectElementWithMatcher:grey_text(@"Cut")]
+      performAction:[GREYActions actionForTap]];
+
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"foo")]
+      performAction:[GREYActions actionForTypeText:@"FromEarlGrey"]];
+
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"foo")]
+      performAction:[GREYActions actionForLongPressAtPoint:CGPointMake(1, 1) duration:1.0]];
+
+  [[EarlGrey selectElementWithMatcher:grey_text(@"Paste")]
+      performAction:[GREYActions actionForTap]];
+
+  // Smart Inserts in Xcode 9 cause a space to appear by default after a paste. This attribute
+  // is not available on Xcode 7 and therefore cannot be used to fix the test. Therefore, we
+  // are changing the value based on the Xcode version.
+  if (iOS11_OR_ABOVE()) {
+    [[EarlGrey selectElementWithMatcher:grey_text(@"Hello FromEarlGrey")]
+        assertWithMatcher:grey_sufficientlyVisible()];
+  } else {
+    [[EarlGrey selectElementWithMatcher:grey_text(@"HelloFromEarlGrey")]
+        assertWithMatcher:grey_sufficientlyVisible()];
+  }
+}
+
 - (void)testBasicInteractionWithStepper {
   [[EarlGrey selectElementWithMatcher:grey_kindOfClass([UIStepper class])]
       performAction:[GREYActions actionForSetStepperValue:87]];
@@ -251,7 +301,7 @@
 
 - (void)testInteractionWithHiddenLabel {
   [[EarlGrey selectElementWithMatcher:[GREYMatchers matcherForAccessibilityLabel:@"Hidden Label"]]
-      assertWithMatcher:grey_text(@"Hidden Label Text")];
+      assertWithMatcher:grey_text(@"Hidden Label")];
 }
 
 - (void)testInteractionWithLabelWithParentWithAlphaZero {
@@ -357,6 +407,15 @@
   [[EarlGrey selectElementWithMatcher:buttonMatcher] assertWithMatcher:grey_not(grey_selected())];
   [[EarlGrey selectElementWithMatcher:buttonMatcher] performAction:grey_tap()];
   [[EarlGrey selectElementWithMatcher:buttonMatcher] assertWithMatcher:grey_selected()];
+}
+
+- (void)testTappingOnADisabledButton {
+  NSError *error;
+  [[EarlGrey selectElementWithMatcher:grey_buttonTitle(@"Disabled")]
+      performAction:grey_tap()
+      error:&error];
+  XCTAssertEqualObjects(error.domain, kGREYInteractionErrorDomain);
+  XCTAssertEqual(error.code, kGREYInteractionConstraintsFailedErrorCode);
 }
 
 #pragma mark - Private

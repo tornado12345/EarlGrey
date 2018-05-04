@@ -26,11 +26,18 @@ NSString *const kGREYNoMatchingElementException = @"NoMatchingElementException";
 NSString *const kGREYMultipleElementsFoundException = @"MultipleElementsFoundException";
 NSString *const kGREYNotNilException = @"NotNilException";
 NSString *const kGREYTimeoutException = @"TimeoutException";
+NSString *const kGREYConstraintFailedException = @"ConstraintFailedException";
 
 @implementation GREYFrameworkException
 
 + (instancetype)exceptionWithName:(NSString *)name reason:(NSString *)reason {
-  return [[GREYFrameworkException alloc] initWithName:name reason:reason userInfo:nil];
+  return [self exceptionWithName:name reason:reason userInfo:nil];
+}
+
++ (instancetype)exceptionWithName:(NSString *)name
+                           reason:(NSString *)reason
+                         userInfo:(NSDictionary *)userInfo {
+  return [[GREYFrameworkException alloc] initWithName:name reason:reason userInfo:userInfo];
 }
 
 @end

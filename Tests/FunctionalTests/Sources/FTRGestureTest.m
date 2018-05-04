@@ -16,6 +16,8 @@
 
 #import "FTRBaseIntegrationTest.h"
 
+#import <EarlGrey/EarlGrey.h>
+
 @interface FTRGestureTest : FTRBaseIntegrationTest
 @end
 
@@ -74,12 +76,19 @@
 
 - (void)testLongPress {
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Grey Box")]
-      performAction:grey_longPressWithDuration(0.5f)];
+      performAction:grey_longPress()];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"single long press")]
       assertWithMatcher:grey_sufficientlyVisible()];
 }
 
-- (void)testLongPressAtPoint {
+- (void)testLongPressWithDuration {
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Grey Box")]
+      performAction:grey_longPressWithDuration(1.0)];
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"single long press")]
+      assertWithMatcher:grey_sufficientlyVisible()];
+}
+
+- (void)testLongPressWithDurationAtPoint {
   // Find the bounds of the element.
   __block CGRect targetBounds;
   GREYActionBlock *boundsFinder =
@@ -103,14 +112,14 @@
   };
   for (NSInteger i = 0; i < 4; i++) {
     [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Grey Box")]
-        performAction:grey_longPressAtPointWithDuration(outsidePoints[i], 0.5f)];
+        performAction:grey_longPressAtPointWithDuration(outsidePoints[i], 1.0)];
     [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"single long press")]
         assertWithMatcher:grey_nil()];
   }
 
   // Verify that tapping inside the bounds causes the long press.
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Grey Box")]
-      performAction:grey_longPressAtPointWithDuration(CGPointMake(midX, midX), 0.5f)];
+      performAction:grey_longPressAtPointWithDuration(CGPointMake(midX, midX), 1.0)];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"single long press")]
       assertWithMatcher:grey_sufficientlyVisible()];
 }
@@ -161,25 +170,25 @@
       performAction:grey_swipeFastInDirectionWithStartPoint(kGREYDirectionUp, 0.25, 0.25)];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"swipe up")]
       assertWithMatcher:grey_sufficientlyVisible()];
-  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"x:70.0 - y:70.0")]
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"x:54.0 - y:49.0")]
       assertWithMatcher:grey_sufficientlyVisible()];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Grey Box")]
       performAction:grey_swipeFastInDirectionWithStartPoint(kGREYDirectionDown, 0.75, 0.75)];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"swipe down")]
       assertWithMatcher:grey_sufficientlyVisible()];
-  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"x:210.0 - y:210.0")]
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"x:162.0 - y:147.0")]
       assertWithMatcher:grey_sufficientlyVisible()];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Grey Box")]
       performAction:grey_swipeFastInDirectionWithStartPoint(kGREYDirectionLeft, 0.875, 0.5)];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"swipe left")]
       assertWithMatcher:grey_sufficientlyVisible()];
-  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"x:245.0 - y:140.0")]
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"x:189.0 - y:98.0")]
       assertWithMatcher:grey_sufficientlyVisible()];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Grey Box")]
       performAction:grey_swipeFastInDirectionWithStartPoint(kGREYDirectionRight, 0.125, 0.75)];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"swipe right")]
       assertWithMatcher:grey_sufficientlyVisible()];
-  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"x:35.0 - y:210.0")]
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"x:27.0 - y:147.0")]
       assertWithMatcher:grey_sufficientlyVisible()];
 }
 
@@ -204,7 +213,7 @@
 
 #pragma mark - Private
 
-// Asserts that Swipe works in all directions by verifying if the swipe gestures are correctly
+// Asserts that swipe works in all directions by verifying if the swipe gestures are correctly
 // recognized.
 - (void)ftr_assertSwipeWorksInAllDirections {
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Grey Box")]
@@ -229,12 +238,15 @@
 // recognized.
 - (void)ftr_assertPinchWorksInAllDirections {
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Grey Box")]
-      performAction:grey_pinchFastInDirection(kGREYPinchDirectionOutward)];
+      performAction:grey_pinchFastInDirectionAndAngle(kGREYPinchDirectionOutward,
+                                                      kGREYPinchAngleDefault)];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"gesture")]
       assertWithMatcher:grey_text(@"pinch out")];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Grey Box")]
-      performAction:grey_pinchSlowInDirection(kGREYPinchDirectionInward)];
+      performAction:grey_pinchSlowInDirectionAndAngle(kGREYPinchDirectionInward,
+                                                      kGREYPinchAngleDefault)];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"gesture")]
       assertWithMatcher:grey_text(@"pinch in")];
 }
+
 @end

@@ -16,12 +16,13 @@
 
 #import "GREYBaseTest.h"
 
-#import <EarlGrey/GREYConfiguration.h>
-#import <EarlGrey/GREYSwizzler.h>
-#import <EarlGrey/UIApplication+GREYAdditions.h>
 #import <OCMock/OCMock.h>
 #import <objc/message.h>
 
+#import "Additions/UIApplication+GREYAdditions.h"
+#import <EarlGrey/GREYConfiguration.h>
+#import "Common/GREYScreenshotUtil+Internal.h"
+#import "Common/GREYSwizzler.h"
 #import "GREYExposedForTesting.h"
 
 // A list containing UIImage that are returned by each invocation of takeScreenShot of
@@ -30,6 +31,9 @@ static NSMutableArray *gScreenShotsToReturnByGREYScreenshotUtil;
 
 // Real, original / unmocked shared UIApplication.
 static id gRealSharedApplication;
+
+// A CGRect value to use for instantiating views
+const CGRect kTestRect = { { 0.0f, 0.0f }, { 10.0f, 10.0f } };
 
 #pragma mark - GREYUTFailureHandler
 
@@ -59,9 +63,10 @@ static id gRealSharedApplication;
   @autoreleasepool {
     Class screenshotUtilClass = [GREYScreenshotUtil class];
     GREYSwizzler *swizzler = [[GREYSwizzler alloc] init];
+    SEL fakeSelector = @selector(greyswizzled_fakeTakeScreenshotAfterScreenUpdates:);
     BOOL success = [swizzler swizzleClass:screenshotUtilClass
-                       replaceClassMethod:@selector(takeScreenshot)
-                               withMethod:@selector(greyswizzled_fakeTakeScreenshot)];
+                       replaceClassMethod:@selector(grey_takeScreenshotAfterScreenUpdates:)
+                               withMethod:fakeSelector];
     NSAssert(success, @"Couldn't swizzle GREYScreenshotUtil takeScreenshot");
 
     success =
@@ -76,7 +81,7 @@ static id gRealSharedApplication;
 
 #pragma mark - Swizzled Implementation
 
-+ (UIImage *)greyswizzled_fakeTakeScreenshot {
++ (UIImage *)greyswizzled_fakeTakeScreenshotAfterScreenUpdates:(BOOL)afterScreenUpdates {
   UIImage *image;
 
   if (gScreenShotsToReturnByGREYScreenshotUtil.count > 0) {

@@ -14,9 +14,9 @@
 // limitations under the License.
 //
 
-#import <EarlGrey/GREYScrollAction.h>
 #import <OCMock/OCMock.h>
 
+#import "Action/GREYScrollAction.h"
 #import "GREYBaseTest.h"
 
 @interface GREYScrollActionTest : GREYBaseTest
@@ -58,9 +58,9 @@
     scrollAction = [[GREYScrollAction alloc] initWithDirection:kGREYDirectionUp amount:amount];
     XCTFail(@"Should have thrown an exception for scroll amount %f", (float)amount);
   } @catch (NSException *exception) {
-    XCTAssertEqualObjects(@"Scroll 'amount' must be positive and greater than zero.",
+    XCTAssertEqualObjects(@"Scroll amount must be positive and greater than zero.",
                           [exception description],
-                          @"Should throw GREYActionFailException");
+                          @"Should throw NSInternalInconsistencyException");
   }
 }
 

@@ -16,6 +16,7 @@
 
 #import "FTRBaseIntegrationTest.h"
 #import "FTRTableViewController.h"
+#import <EarlGrey/EarlGrey.h>
 
 @interface FTRUITableViewTest : FTRBaseIntegrationTest
 @end
@@ -153,38 +154,6 @@
       assertWithMatcher:notScrollingMatcher];
   [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Row 1")]
       assertWithMatcher:grey_sufficientlyVisible()];
-}
-
-- (void)testSearchActionIsNotPerformedAfterTimeout {
-  __block CGPoint expectedOffset;
-  [[EarlGrey selectElementWithMatcher:grey_kindOfClass([UITableView class])]
-      assert:[GREYAssertionBlock assertionWithName:@"offset"
-                           assertionBlockWithError:^BOOL(id element, NSError *__strong *error) {
-                          expectedOffset = [element contentOffset];
-                          return YES;
-  }]];
-  // No need to reset this, base class does it already.
-  [[GREYConfiguration sharedInstance] setValue:@(0.0)
-                                  forConfigKey:kGREYConfigKeyInteractionTimeoutDuration];
-  NSError *err;
-  [[[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(@"Row 100")]
-      usingSearchAction:grey_scrollInDirection(kGREYDirectionDown, 100)
-   onElementWithMatcher:grey_kindOfClass([UITableView class])]
-      assertWithMatcher:grey_interactable() error:&err];
-  GREYAssertEqualObjects(err.domain, kGREYInteractionErrorDomain, @"should be equal");
-  GREYAssertEqual(err.code, kGREYInteractionElementNotFoundErrorCode, @"should be equal");
-
-  [[EarlGrey selectElementWithMatcher:grey_kindOfClass([UITableView class])]
-      assert:[GREYAssertionBlock assertionWithName:@"offset didn't change"
-                           assertionBlockWithError:^BOOL(id element, NSError *__strong *error) {
-                          CGPoint actualOffset = [element contentOffset];
-                          GREYAssertTrue(CGPointEqualToPoint(actualOffset, expectedOffset),
-                                         @"Table view was scrolled after timeout."
-                                         @"Expected offset: %@ actualOffset: %@",
-                                         NSStringFromCGPoint(expectedOffset),
-                                         NSStringFromCGPoint(actualOffset));
-                          return YES;
-  }]];
 }
 
 #pragma mark - Private

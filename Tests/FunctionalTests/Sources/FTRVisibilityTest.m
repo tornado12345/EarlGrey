@@ -14,11 +14,10 @@
 // limitations under the License.
 //
 
-#import <EarlGrey/CGGeometry+GREYAdditions.h>
-#import <EarlGrey/GREYElementHierarchy.h>
-#import <EarlGrey/GREYVisibilityChecker.h>
-
 #import "FTRBaseIntegrationTest.h"
+#import "Additions/CGGeometry+GREYAdditions.h"
+#import "Common/GREYVisibilityChecker.h"
+#import <EarlGrey/EarlGrey.h>
 
 @interface FTRVisibilityTest : FTRBaseIntegrationTest
 @end
@@ -35,6 +34,30 @@
 - (void)tearDown {
   [_outerview removeFromSuperview];
   [super tearDown];
+}
+
+- (void)testOverlappingViews {
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"bottomScrollView")]
+      performAction:grey_scrollToContentEdge(kGREYContentEdgeTop)];
+
+  BOOL (^assertionBlock)(id element, NSError *__strong *errorOrNil) =
+      ^BOOL(id element, NSError *__strong *errorOrNil) {
+        CGPoint offset = ((UIScrollView *)element).contentOffset;
+        CGPoint expectedOffset = CGPointMake(100, 100);
+        if (CGPointEqualToPoint(offset, expectedOffset)) {
+          return YES;
+        } else {
+          NSError *error =
+              [[NSError alloc] initWithDomain:kGREYInteractionErrorDomain
+                                         code:kGREYInteractionAssertionFailedErrorCode
+                                     userInfo:@{NSLocalizedDescriptionKey : @"Cover view moved."}];
+          *errorOrNil = error;
+          return NO;
+        }
+      };
+  id<GREYAssertion> assertion = [GREYAssertionBlock assertionWithName:@"coverContentOffsetUnchanged"
+                                              assertionBlockWithError:assertionBlock];
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"coverScrollView")] assert:assertion];
 }
 
 - (void)testTranslucentViews {
@@ -150,13 +173,13 @@
   ]];
 }
 
-- (void)testVisibilityFailsWithHiddenActivationPoint {
-  // Verify FTRRedBar cannot be interacted with hidden activation point.
+- (void)testVisibilityFailsWhenViewIsObscured {
+  // Verify FTRRedBar cannot be interacted with when overlapped by another view.
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"FTRRedBar")]
       assertWithMatcher:grey_not(grey_interactable())];
 
   // Unhide the activation point.
-  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"FTRShowActivationPoint")]
+  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"FTRUnObscureRedBar")]
       performAction:[GREYActions actionForTurnSwitchOn:YES]];
 
   // Verify FTRRedBar can now be interacted with.
@@ -219,7 +242,15 @@
 
 - (void)testElementsInHierarchyDump {
   NSString *hierarchyDump = [GREYElementHierarchy hierarchyStringForAllUIWindows];
-  NSArray *stringTargetHierarchy =
+  NSArray *stringTargetHierarchy_iOS10Later =
+      @[ @"========== Window 1 ==========",
+         @"<UIWindow:",
+         @"  |--<UILayoutContainerView:",
+         @"  |  |--<UINavigationTransitionView:",
+         @"  |  |  |--<UIViewControllerWrapperView:",
+         @"  |  |  |  |--<UIView",
+         @"  |  |  |  |  |--<UIView:"];
+  NSArray *stringTargetHierarchy_iOS9Earlier =
       @[ @"========== Window 1 ==========",
          @"========== Window 2 ==========",
          @"<UITextEffectsWindow",
@@ -231,8 +262,16 @@
          @"  |  |  |--<UIViewControllerWrapperView:",
          @"  |  |  |  |--<UIView",
          @"  |  |  |  |  |--<UIView:"];
-  for (NSString *targetString in stringTargetHierarchy) {
-    XCTAssertNotEqual([hierarchyDump rangeOfString:targetString].location, (NSUInteger)NSNotFound);
+  if (iOS10_OR_ABOVE()) {
+    for (NSString *targetString in stringTargetHierarchy_iOS10Later) {
+      XCTAssertNotEqual([hierarchyDump rangeOfString:targetString].location,
+                        (NSUInteger)NSNotFound);
+    }
+  } else {
+    for (NSString *targetString in stringTargetHierarchy_iOS9Earlier) {
+      XCTAssertNotEqual([hierarchyDump rangeOfString:targetString].location,
+                        (NSUInteger)NSNotFound);
+    }
   }
 }
 
@@ -242,7 +281,8 @@
   GREYAssertionBlock *assertAxId =
       [GREYAssertionBlock assertionWithName:@"Check Accessibility Id"
                     assertionBlockWithError:^BOOL(id element, NSError *__strong *errorOrNil) {
-                      NSParameterAssert(element);
+                      XCTAssertNotNil(element);
+
                       [grey_sufficientlyVisible() matches:element];
                       UIView *view = element;
                       [idSet addObject:view.accessibilityIdentifier];

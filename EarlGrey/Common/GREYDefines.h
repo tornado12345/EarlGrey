@@ -21,13 +21,11 @@
 
 #import <UIKit/UIKit.h>
 
-#ifndef EARLGREY_DEFINES_H
-#define EARLGREY_DEFINES_H
+#ifndef GREY_DEFINES_H
+#define GREY_DEFINES_H
 
 #define GREY_EXPORT FOUNDATION_EXPORT __used
-
 #define GREY_EXTERN FOUNDATION_EXTERN
-
 #define GREY_UNUSED_VARIABLE __attribute__((unused))
 
 #define iOS8_0_OR_ABOVE() ([UIDevice currentDevice].systemVersion.doubleValue >= 8.0)
@@ -35,6 +33,7 @@
 #define iOS8_2_OR_ABOVE() ([UIDevice currentDevice].systemVersion.doubleValue >= 8.2)
 #define iOS9_OR_ABOVE() ([UIDevice currentDevice].systemVersion.intValue >= 9)
 #define iOS10_OR_ABOVE() ([UIDevice currentDevice].systemVersion.intValue >= 10)
+#define iOS11_OR_ABOVE() ([UIDevice currentDevice].systemVersion.intValue >= 11)
 
 #pragma mark - Math
 
@@ -52,14 +51,4 @@
  */
 #define grey_floor(x) ((CGFloat)floor(x))
 
-#if CGFLOAT_IS_DOUBLE
-  #define grey_fabs(x) fabs(x)
-  #define grey_cos(x) cos(x)
-  #define grey_sin(x) sin(x)
-#else
-  #define grey_fabs(x) fabsf(x)
-  #define grey_cos(x) cosf(x)
-  #define grey_sin(x) sinf(x)
-#endif
-
-#endif  // EARLGREY_DEFINES_H
+#endif  // GREY_DEFINES_H

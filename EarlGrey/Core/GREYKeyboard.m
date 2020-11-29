@@ -156,7 +156,7 @@ static NSString *const kReturnKeyIdentifier = @"\n";
     // Note: more, numbers label must be after shift and SHIFT labels, because it is also used for
     // the key for switching between keyplanes.
     gShiftKeyLabels =
-        @[ @"shift", @"Shift", @"SHIFT", @"more, symbols", @"more, numbers", @"more", @"MORE" ];
+        @[ @"shift", @"Shift", @"SHIFT", @"more, symbols", @"more, numbers", @"numbers", @"more", @"MORE" ];
 
     NSCharacterSet *lowerCaseSet = [NSCharacterSet lowercaseLetterCharacterSet];
     gAlphabeticKeyplaneCharacters = [NSMutableCharacterSet uppercaseLetterCharacterSet];
@@ -206,9 +206,10 @@ static NSString *const kReturnKeyIdentifier = @"\n";
         GREYLogVerbose(@"Detected an alphabetic key.");
         // Switch to alphabetic keyplane if we are on numbers/symbols keyplane.
         if (![GREYKeyboard grey_isAlphabeticKeyplaneShown]) {
-          id moreLettersKey = [GREYKeyboard grey_waitAndfindKeyForCharacter:@"more, letters"];
+          NSString *moreLettersKeyAxLabel = iOS13_OR_ABOVE() ? @"letters" : @"more, letters";
+          id moreLettersKey = [GREYKeyboard grey_waitAndfindKeyForCharacter:moreLettersKeyAxLabel];
           if (!moreLettersKey) {
-            return [GREYKeyboard grey_setErrorForkeyNotFoundWithAccessibilityLabel:@"more, letters"
+            return [GREYKeyboard grey_setErrorForkeyNotFoundWithAccessibilityLabel:moreLettersKeyAxLabel
                                                                    forTypingString:string
                                                                              error:errorOrNil];
           }
@@ -224,11 +225,13 @@ static NSString *const kReturnKeyIdentifier = @"\n";
         GREYLogVerbose(@"Detected a non-alphabetic key.");
         // Switch to numbers/symbols keyplane if we are on alphabetic keyplane.
         if ([GREYKeyboard grey_isAlphabeticKeyplaneShown]) {
-          id moreNumbersKey = [GREYKeyboard grey_waitAndfindKeyForCharacter:@"more, numbers"];
+          NSString *moreNumberKeyAxLabel = iOS13_OR_ABOVE() ? @"numbers" : @"more, numbers";
+          id moreNumbersKey = [GREYKeyboard grey_waitAndfindKeyForCharacter:moreNumberKeyAxLabel];
           if (!moreNumbersKey) {
-            return [GREYKeyboard grey_setErrorForkeyNotFoundWithAccessibilityLabel:@"more, numbers"
-                                                                   forTypingString:string
-                                                                             error:errorOrNil];
+            return
+                [GREYKeyboard grey_setErrorForkeyNotFoundWithAccessibilityLabel:moreNumberKeyAxLabel
+                                                                forTypingString:string
+                                                                          error:errorOrNil];
           }
           [GREYKeyboard grey_tapKey:moreNumbersKey error:errorOrNil];
           key = [GREYKeyboard grey_waitAndfindKeyForCharacter:characterAsString];
@@ -244,9 +247,10 @@ static NSString *const kReturnKeyIdentifier = @"\n";
         // If key is not on either number or symbols keyplane, it could be on alphabetic keyplane.
         // This is the case for @ _ - on UIKeyboardTypeEmailAddress on iPad.
         if (!key) {
-          id moreLettersKey = [GREYKeyboard grey_waitAndfindKeyForCharacter:@"more, letters"];
+          NSString *moreLettersKeyAxLabel = iOS13_OR_ABOVE() ? @"letters" : @"more, letters";
+          id moreLettersKey = [GREYKeyboard grey_waitAndfindKeyForCharacter:moreLettersKeyAxLabel];
           if (!moreLettersKey) {
-            return [GREYKeyboard grey_setErrorForkeyNotFoundWithAccessibilityLabel:@"more, letters"
+            return [GREYKeyboard grey_setErrorForkeyNotFoundWithAccessibilityLabel:moreLettersKeyAxLabel
                                                                    forTypingString:string
                                                                              error:errorOrNil];
           }

@@ -214,7 +214,7 @@
     NSError *executorError;
     __block NSError *actionError = nil;
 
-    // Create the user info dictionary for any notificatons and set it up with the action.
+    // Create the user info dictionary for any notifications and set it up with the action.
     NSMutableDictionary *actionUserInfo = [[NSMutableDictionary alloc] init];
     [actionUserInfo setObject:action forKey:kGREYActionUserInfoKey];
     NSNotificationCenter *defaultNotificationCenter = [NSNotificationCenter defaultCenter];
@@ -369,7 +369,7 @@
       id element = (elements.count != 0) ?
       [strongSelf grey_uniqueElementInMatchedElements:elements andError:&assertionError] : nil;
 
-      // Create the user info dictionary for any notificatons and set it up with the assertion.
+      // Create the user info dictionary for any notifications and set it up with the assertion.
       NSMutableDictionary *assertionUserInfo = [[NSMutableDictionary alloc] init];
       [assertionUserInfo setObject:assertion forKey:kGREYAssertionUserInfoKey];
 
@@ -510,6 +510,15 @@
   // any index passed or populate the passed error if the multiple matches are present and
   // an incorrect index was passed.
   if (elements.count > 1) {
+    if (iOS13_OR_ABOVE()) {
+      // Temporary fix for Xcode 11 beta 1.
+      if (elements.count == 2 &&
+          [[elements[0] accessibilityIdentifier]
+              isEqualToString:[elements[1] accessibilityIdentifier]] &&
+          [elements[0] isKindOfClass:[UITextField class]] &&
+          [elements[1] isKindOfClass:NSClassFromString(@"UIAccessibilityTextFieldElement")])
+        return elements[0];
+    }
     // If the number of matched elements are greater than 1 then we have to use the index for
     // matching. We perform a bounds check on the index provided here and throw an exception if
     // it fails.

@@ -1,3 +1,5 @@
+Deprecation: EarlGrey 1.0 is deprecated in favor of EarlGrey 2.0 which integrates it with XCUITest. Please look at the [earlgrey2](https://github.com/google/EarlGrey/tree/earlgrey2) branch. EarlGrey 1.0 is not being maintained internally with iOS 13.
+
 # EarlGrey
 [![Apache License](https://img.shields.io/badge/license-Apache%202-lightgrey.svg?style=flat)](https://github.com/google/EarlGrey/blob/master/LICENSE)
 [![CC-BY 4.0 License](https://img.shields.io/badge/license-CC%20BY%204.0-lightgrey.svg)](https://github.com/google/EarlGrey/blob/master/LICENSE)
@@ -5,6 +7,8 @@
 [![Carthage compatible](https://img.shields.io/badge/Carthage-compatible-4BC51D.svg?style=flat)](https://github.com/Carthage/Carthage)
 [![CocoaPods](https://img.shields.io/cocoapods/v/EarlGrey.svg?maxAge=2592000)](https://cocoapods.org/pods/EarlGrey)
 [![Gem Version](https://badge.fury.io/rb/earlgrey.svg)](https://rubygems.org/gems/earlgrey)
+
+**For EarlGrey 2, please go to [earlgrey2 branch](https://github.com/google/EarlGrey/tree/earlgrey2).**
 
 EarlGrey is a native iOS UI automation test framework that enables you to write
 clear, concise tests.
